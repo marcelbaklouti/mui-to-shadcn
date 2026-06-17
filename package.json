@@ -1,0 +1,73 @@
+{
+  "name": "mui-to-shadcn",
+  "version": "0.1.0",
+  "description": "A ts-morph codemod that converts Material UI (MUI) React code to shadcn/ui, including sx and system props to Tailwind. Optional one-command setup installs the needed shadcn components.",
+  "keywords": [
+    "mui",
+    "material-ui",
+    "shadcn",
+    "shadcn-ui",
+    "codemod",
+    "migration",
+    "ts-morph",
+    "tailwind",
+    "react",
+    "nextjs",
+    "radix",
+    "base-ui"
+  ],
+  "license": "MIT",
+  "author": "Marcel Baklouti (https://baklouti.de)",
+  "homepage": "https://github.com/marcelbaklouti/mui-to-shadcn#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marcelbaklouti/mui-to-shadcn.git"
+  },
+  "bugs": {
+    "url": "https://github.com/marcelbaklouti/mui-to-shadcn/issues"
+  },
+  "type": "module",
+  "bin": {
+    "mui-to-shadcn": "dist/cli.js"
+  },
+  "main": "dist/run.js",
+  "types": "dist/run.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/run.d.ts",
+      "import": "./dist/run.js"
+    },
+    "./mappings": {
+      "types": "./dist/mappings.d.ts",
+      "import": "./dist/mappings.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.de.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist",
+    "docs": "tsx scripts/generate-components.ts",
+    "migrate": "tsx src/cli.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run clean && npm run build && npm test"
+  },
+  "dependencies": {
+    "ts-morph": "^28.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "lucide-react": "^1.20.0",
+    "tsx": "^4.22.4",
+    "typescript": "^5.7.3"
+  }
+}
