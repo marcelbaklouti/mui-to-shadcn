@@ -20,7 +20,6 @@ const inParent: Record<string, string> = {
   AccordionSummary: "AccordionTrigger (in Accordion)",
   AccordionDetails: "AccordionContent (in Accordion)",
   Tab: "TabsTrigger (in Tabs)",
-  FormControlLabel: "div + RadioGroupItem + Label (in RadioGroup)",
   Radio: "RadioGroupItem (in RadioGroup)",
   ToggleButton: "ToggleGroupItem (in ToggleButtonGroup)",
   TabList: "TabsList (in TabContext)",
@@ -65,6 +64,14 @@ const targetOverride: Record<string, string> = {
   Grow: "(unwrapped)",
   Zoom: "(unwrapped)",
   Slide: "(unwrapped)",
+  FormControlLabel: "div + control + Label",
+  Timeline: "ul + li/div/span (semantic)",
+  CardMedia: "img",
+  TableSortLabel: "button + sort icon",
+  DialogContent: "DialogContent",
+  DialogTitle: "DialogTitle",
+  DialogContentText: "DialogDescription",
+  DialogActions: "DialogFooter",
 };
 
 const notes: Record<string, string> = {
@@ -98,6 +105,11 @@ const notes: Record<string, string> = {
   Grow: "unwrapped; recreate animation with tw-animate-css",
   Zoom: "unwrapped; recreate animation with tw-animate-css",
   Slide: "unwrapped; recreate animation with tw-animate-css",
+  FormControlLabel: "the control (Checkbox/Switch/Radio) is converted inline",
+  Timeline: "best-effort semantic markup; review the layout",
+  Radio: "standalone works; must be inside a RadioGroup",
+  ButtonBase: "native button (unstyled); add styling or use Button",
+  TableSortLabel: "active/direction dropped; wire sorting manually",
 };
 
 const partialNotes: Record<string, string> = {

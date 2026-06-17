@@ -4,6 +4,24 @@ All notable changes to this project are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-17
+
+Driven by a real-world audit (2289 files): converts the most common remaining manual components. Catalogue grows to 115 (99 full, 7 in parent, 4 partial, 5 manual).
+
+### Added
+
+- **FormControlLabel** (standalone): becomes `div` + the converted control + `Label`. The control in `control={<Checkbox/Switch/Radio … />}` is converted inline (incl. `onChange` → `onCheckedChange`), with an `htmlFor`/`id` derived from the label/value.
+- **Standalone Dialog parts**: `DialogTitle` → `DialogTitle`, `DialogContent` → `DialogContent`, `DialogContentText` → `DialogDescription`, `DialogActions` → `DialogFooter` (in-Dialog usage was already handled).
+- **Timeline family** (MUI Lab): `Timeline`/`TimelineItem`/`TimelineSeparator`/`TimelineDot`/`TimelineConnector`/`TimelineContent`/`TimelineOppositeContent` → semantic `ul`/`li`/`div`/`span` markup (best-effort).
+- **ButtonBase** → native `button`; **CardActionArea** → clickable `button`.
+- **CardMedia** → `img` (with `image`→`src`, `height`/`width`→classes) or `div`.
+- **TableSortLabel** → `button` + a lucide `ChevronsUpDown` icon (sorting state flagged).
+- **Standalone Radio** → `RadioGroupItem` (with a "must be inside a RadioGroup" note); **standalone ToggleButton** → `Toggle`.
+
+### Changed
+
+- `TablePagination` now reports a concrete recipe (Pagination + rows-per-page state) instead of a generic "not in the registry" note.
+
 ## [0.1.0] - 2026-06-17
 
 First public release.

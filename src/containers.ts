@@ -976,3 +976,126 @@ export const stepLabelTransform: CompositeTransform = (context) => {
   const inner = context.element.hasChildren ? context.element.innerText.trim() : "";
   return `<span className="text-sm font-medium">${inner}</span>`;
 };
+
+function controlElementOf(node: JsxElementLike): JsxElementLike | undefined {
+  const opening = Node.isJsxElement(node) ? node.getOpeningElement() : node;
+  for (const attr of opening.getAttributes()) {
+    if (!Node.isJsxAttribute(attr) || attr.getNameNode().getText() !== "control") continue;
+    const initializer = attr.getInitializer();
+    if (initializer && Node.isJsxExpression(initializer)) {
+      const expression = initializer.getExpression();
+      if (expression && (Node.isJsxElement(expression) || Node.isJsxSelfClosingElement(expression))) {
+        return expression;
+      }
+    }
+  }
+  return undefined;
+}
+
+function convertFormControlLabelControl(
+  context: ContainerContext,
+  controlNode: JsxElementLike,
+  id: string | undefined,
+  fclValue: ParsedAttribute | undefined,
+): string {
+  const canonical = context.localToCanonical.get(getTagName(controlNode));
+  const controlElement = parseElement(controlNode, context.fullText);
+  const idAttr = id ? ` id="${id}"` : "";
+
+  if (canonical === "Checkbox" || canonical === "Switch") {
+    const importPath = canonical === "Checkbox" ? "@/components/ui/checkbox" : "@/components/ui/switch";
+    context.registerImport({ names: [canonical], moduleSpecifier: importPath });
+    context.markConverted(canonical);
+    const parts: string[] = [];
+    for (const entry of controlElement.attributes) {
+      if (entry.name === "color" || entry.name === "size") continue;
+      if (entry.name === "onChange") {
+        context.warn(`${canonical} onChange -> onCheckedChange; the handler now receives a boolean instead of an event`);
+        parts.push(renderAttribute({ name: "onCheckedChange", value: entry.value }));
+        continue;
+      }
+      parts.push(renderAttribute(entry));
+    }
+    const attrText = parts.length ? " " + parts.join(" ") : "";
+    return `<${canonical}${idAttr}${attrText} />`;
+  }
+
+  if (canonical === "Radio") {
+    context.registerImport({ names: ["RadioGroupItem"], moduleSpecifier: "@/components/ui/radio-group" });
+    context.markConverted("Radio");
+    const valueAttr = controlElement.attributes.find((entry) => entry.name === "value") ?? fclValue;
+    const valueText = valueAttr ? ` value=${renderAttributeValue(valueAttr.value)}` : "";
+    return `<RadioGroupItem${valueText}${idAttr} />`;
+  }
+
+  const parts = controlElement.attributes.map((entry) => renderAttribute(entry));
+  const attrText = parts.length ? " " + parts.join(" ") : "";
+  return `<${getTagName(controlNode)}${idAttr}${attrText} />`;
+}
+
+export function formControlLabelContainer(context: ContainerContext): ContainerEdit[] {
+  const { node, element, indent } = context;
+  context.registerImport({ names: ["Label"], moduleSpecifier: "@/components/ui/label" });
+  const labelAttr = attribute(element, "label");
+  const valueAttr = attribute(element, "value");
+  const labelStr = labelAttr && labelAttr.value.kind === "string" ? labelAttr.value.value : undefined;
+  const valueStr = valueAttr && valueAttr.value.kind === "string" ? valueAttr.value.value : undefined;
+  const id = valueStr ? slug(valueStr) : labelStr ? slug(labelStr) : undefined;
+
+  const controlNode = controlElementOf(node);
+  let controlJsx = "{/* control */}";
+  if (controlNode) {
+    controlJsx = convertFormControlLabelControl(context, controlNode, id, valueAttr);
+  } else {
+    context.warn("FormControlLabel control is not a static element; rebuild the control manually");
+  }
+  if (!id) {
+    context.warn("FormControlLabel without a static value/label; link the control and Label via id/htmlFor manually");
+  }
+
+  const labelChild = labelAttr ? valueAsChild(labelAttr.value) : "";
+  const htmlFor = id ? ` htmlFor="${id}"` : "";
+  const replacement = [
+    `<div className="flex items-center gap-2">`,
+    `${indent}  ${controlJsx}`,
+    `${indent}  <Label${htmlFor}>${labelChild}</Label>`,
+    `${indent}</div>`,
+  ].join("\n");
+  consumeSubtree(context, node);
+  return [{ start: node.getStart(), end: node.getEnd(), replacement }];
+}
+
+const TIMELINE_TAGS: Record<string, { tag: string; className: string }> = {
+  TimelineItem: { tag: "li", className: "flex gap-4" },
+  TimelineSeparator: { tag: "div", className: "flex flex-col items-center" },
+  TimelineDot: { tag: "span", className: "size-3 rounded-full bg-primary" },
+  TimelineConnector: { tag: "span", className: "w-px grow bg-border" },
+  TimelineContent: { tag: "div", className: "flex-1 pb-4" },
+  TimelineOppositeContent: { tag: "div", className: "flex-1 text-right text-muted-foreground" },
+};
+
+export function timelineContainer(context: ContainerContext): ContainerEdit[] {
+  const { node } = context;
+  context.warn("Timeline converted to semantic markup (best-effort); review the layout and connectors");
+  const open = openingElementRange(node);
+  const close = closingElementRange(node);
+  const edits: ContainerEdit[] = [{ start: open.start, end: open.end, replacement: `<ul className="flex flex-col">` }];
+  if (close) edits.push({ start: close.start, end: close.end, replacement: "</ul>" });
+
+  for (const descendant of descendantJsxElements(node)) {
+    const canonical = context.localToCanonical.get(getTagName(descendant));
+    const map = canonical ? TIMELINE_TAGS[canonical] : undefined;
+    if (!map || !canonical) continue;
+    const childOpen = openingElementRange(descendant);
+    const childClose = closingElementRange(descendant);
+    if (childClose) {
+      edits.push({ start: childOpen.start, end: childOpen.end, replacement: `<${map.tag} className="${map.className}">` });
+      edits.push({ start: childClose.start, end: childClose.end, replacement: `</${map.tag}>` });
+    } else {
+      edits.push({ start: descendant.getStart(), end: descendant.getEnd(), replacement: `<${map.tag} className="${map.className}" />` });
+    }
+    context.consume(descendant);
+    context.markConverted(canonical);
+  }
+  return edits;
+}
