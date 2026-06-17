@@ -283,3 +283,58 @@ export const buttonTransform: CompositeTransform = (context) => {
   const leadText = leading.length ? " " + leading.join(" ") : "";
   return `<Button${leadText}${remaining}${classText}>${children}</Button>`;
 };
+
+function dimensionClass(axis: "w" | "h", value: AttributeValue): string | null {
+  if (value.kind === "string") {
+    if (value.value === "100%") return `${axis}-full`;
+    return `${axis}-[${value.value}]`;
+  }
+  if (value.kind === "expression") {
+    const expression = value.expression.trim();
+    if (/^\d+$/.test(expression)) return `${axis}-[${expression}px]`;
+    return `${axis}-[${expression}]`;
+  }
+  return null;
+}
+
+export const cardMediaTransform: CompositeTransform = (context) => {
+  const image = findAttribute(context, "image");
+  const alt = findAttribute(context, "alt");
+  const height = findAttribute(context, "height");
+  const width = findAttribute(context, "width");
+  const consumed = new Set<string>(["image", "alt", "component", "height", "width"]);
+  const classes: string[] = [];
+  if (height) {
+    const cls = dimensionClass("h", height.value);
+    if (cls) classes.push(cls);
+  }
+  if (width) {
+    const cls = dimensionClass("w", width.value);
+    if (cls) classes.push(cls);
+  }
+
+  if (image) {
+    classes.push("w-full", "object-cover");
+    const classText = buildClassName(context, consumed, classes);
+    const rest = renderRemainingAttributes(context, consumed);
+    const altText = alt ? ` ${renderAttribute({ name: "alt", value: alt.value })}` : "";
+    return `<img src=${renderAttributeValue(image.value)}${altText}${rest}${classText} />`;
+  }
+
+  const classText = buildClassName(context, consumed, classes);
+  const rest = renderRemainingAttributes(context, consumed);
+  const inner = context.element.hasChildren ? context.element.innerText.trim() : "";
+  return `<div${rest}${classText}>${inner}</div>`;
+};
+
+export const tableSortLabelTransform: CompositeTransform = (context) => {
+  context.registerImport({ names: ["ChevronsUpDown"], moduleSpecifier: "lucide-react" });
+  const consumed = new Set<string>(["active", "direction", "hideSortIcon", "IconComponent"]);
+  if (findAttribute(context, "active") || findAttribute(context, "direction")) {
+    context.warn("TableSortLabel active/direction dropped; wire sorting state manually (e.g. with TanStack Table)");
+  }
+  const classText = buildClassName(context, consumed, ["inline-flex", "items-center", "gap-1"]);
+  const rest = renderRemainingAttributes(context, consumed);
+  const inner = context.element.hasChildren ? context.element.innerText.trim() : "";
+  return `<button${rest}${classText}>${inner} <ChevronsUpDown className="size-4" /></button>`;
+};

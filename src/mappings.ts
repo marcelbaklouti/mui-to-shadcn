@@ -4,7 +4,9 @@ import {
   avatarTransform,
   buttonTransform,
   cardHeaderTransform,
+  cardMediaTransform,
   chipTransform,
+  tableSortLabelTransform,
   typographyTransform,
 } from "./composites.js";
 import {
@@ -15,6 +17,7 @@ import {
   collapseContainer,
   dialogContainer,
   drawerContainer,
+  formControlLabelContainer,
   formHelperTextTransform,
   listItemTextTransform,
   menuContainer,
@@ -30,6 +33,7 @@ import {
   tableHeadContainer,
   tabsContainer,
   textFieldTransform,
+  timelineContainer,
   toggleGroupContainer,
   tooltipContainer,
   transitionContainer,
@@ -119,14 +123,12 @@ const manualComponents: Record<string, string> = {
   AccordionSummary: "AccordionSummary maps to AccordionTrigger (converted automatically inside Accordion)",
   AccordionDetails: "AccordionDetails maps to AccordionContent (converted automatically inside Accordion)",
   Tab: "Tab maps to TabsTrigger (converted automatically inside Tabs)",
-  FormControlLabel: "FormControlLabel is dropped; combine Label with the control (converted automatically inside RadioGroup)",
-  Radio: "Radio maps to RadioGroupItem (converted automatically inside RadioGroup)",
   TabList: "TabList maps to TabsList (converted automatically inside TabContext)",
   TabPanel: "TabPanel maps to TabsContent (converted automatically inside TabContext)",
   Autocomplete: "Autocomplete -> shadcn Combobox (Popover + Command + Button); needs useState/open state, so build it manually (shadcn add command popover button)",
   DataGrid: "DataGrid -> shadcn Table + @tanstack/react-table (Data Table recipe); needs columns/hooks, so build it manually (shadcn add table; npm i @tanstack/react-table)",
+  TablePagination: "TablePagination -> shadcn Pagination + rows-per-page state; build it manually (shadcn add pagination select)",
   SpeedDial: "SpeedDial has no equivalent; use DropdownMenu or custom floating actions",
-  Timeline: "Timeline has no equivalent; build it manually with flex/grid",
   BottomNavigationAction: "BottomNavigationAction has no equivalent; use a Link/Button in the navigation bar",
 };
 
@@ -517,6 +519,69 @@ export function buildRegistry(): Registry {
     target: "li",
     defaultClassName: "px-4 py-2 text-sm font-medium text-muted-foreground",
     props: { disableGutters: { drop: true }, disableSticky: { drop: true }, inset: { drop: true } },
+  };
+
+  registry.FormControlLabel = { containerTransform: formControlLabelContainer };
+  registry.Timeline = { containerTransform: timelineContainer };
+  registry.CardMedia = { transform: cardMediaTransform };
+  registry.CardActionArea = {
+    target: "button",
+    defaultClassName: "w-full text-left",
+    props: {
+      focusRipple: { drop: true },
+      disableRipple: { drop: true },
+      disableTouchRipple: { drop: true },
+      centerRipple: { drop: true },
+      TouchRippleProps: { drop: true },
+      component: { drop: true },
+    },
+  };
+  registry.ButtonBase = {
+    target: "button",
+    props: {
+      component: { drop: true, warning: "ButtonBase component dropped; replace the tag or use asChild on a shadcn Button" },
+      focusRipple: { drop: true },
+      disableRipple: { drop: true },
+      disableTouchRipple: { drop: true },
+      centerRipple: { drop: true },
+      TouchRippleProps: { drop: true },
+      LinkComponent: { drop: true },
+    },
+    notes: "ButtonBase -> native button (unstyled); add styling or use the shadcn Button",
+  };
+  registry.TableSortLabel = { transform: tableSortLabelTransform };
+
+  registry.Radio = {
+    target: "RadioGroupItem",
+    importPath: "@/components/ui/radio-group",
+    props: {
+      color: { drop: true },
+      size: { drop: true },
+      disableRipple: { drop: true },
+      onChange: { drop: true, warning: "Radio onChange dropped; RadioGroup drives selection via onValueChange" },
+    },
+    notes: "Radio -> RadioGroupItem; must be nested in a RadioGroup",
+  };
+  registry.ToggleButton = {
+    target: "Toggle",
+    importPath: "@/components/ui/toggle",
+    props: {
+      value: { drop: true },
+      selected: { drop: true, warning: "ToggleButton selected: use pressed/onPressedChange on Toggle" },
+      color: { drop: true },
+      size: { drop: true },
+      disableRipple: { drop: true },
+      disableFocusRipple: { drop: true },
+    },
+  };
+
+  registry.DialogContent = { target: "DialogContent", importPath: "@/components/ui/dialog" };
+  registry.DialogTitle = { target: "DialogTitle", importPath: "@/components/ui/dialog" };
+  registry.DialogContentText = { target: "DialogDescription", importPath: "@/components/ui/dialog" };
+  registry.DialogActions = {
+    target: "DialogFooter",
+    importPath: "@/components/ui/dialog",
+    props: { disableSpacing: { drop: true } },
   };
 
   for (const [name, message] of Object.entries(manualComponents)) {

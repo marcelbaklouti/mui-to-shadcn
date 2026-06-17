@@ -2,7 +2,7 @@
 
 > Auto-generated from the registry (`src/mappings.ts`). Regenerate with `npm run docs`.
 
-Catalogued: 106 MUI components. Full: 89, in parent: 8, partial: 4, manual: 5.
+Catalogued: 115 MUI components. Full: 99, in parent: 7, partial: 4, manual: 5.
 
 Plus `@mui/icons-material` → `lucide-react` (~700 icon names mapped) and MUI theme/Emotion infrastructure removal (`ThemeProvider`, `CssBaseline`, cache providers).
 
@@ -23,10 +23,13 @@ Legend: **Full** = structurally fully converted. **In parent** = converted autom
 | Box | div | in the sx / system-props pass |
 | Breadcrumbs | Breadcrumb + List/Item/Link/Page | - |
 | Button | - | - |
+| ButtonBase | button | native button (unstyled); add styling or use Button |
 | Card | Card | - |
+| CardActionArea | button | - |
 | CardActions | CardFooter | - |
 | CardContent | CardContent | - |
 | CardHeader | CardHeader + CardTitle/CardDescription | - |
+| CardMedia | img | - |
 | Checkbox | Checkbox | onChange becomes onCheckedChange (boolean) |
 | Chip | Badge | MUI Badge is separate (counter) and stays manual |
 | CircularProgress | Loader2 (lucide spinner) | spinner shows no determinate progress |
@@ -34,12 +37,17 @@ Legend: **Full** = structurally fully converted. **In parent** = converted autom
 | Collapse | Collapsible + CollapsibleContent | add a CollapsibleTrigger; in becomes open |
 | Container | div (mx-auto, max-width) | in the sx / system-props pass |
 | Dialog | Dialog + Content/Title/Description/Footer | add DialogHeader manually; onClose becomes onOpenChange |
+| DialogActions | DialogFooter | - |
+| DialogContent | DialogContent | - |
+| DialogContentText | DialogDescription | - |
+| DialogTitle | DialogTitle | - |
 | Divider | Separator | - |
 | Drawer | Sheet + SheetContent | add SheetTrigger if needed; onClose becomes onOpenChange |
 | Fab | Button | - |
 | Fade | (unwrapped) | unwrapped; recreate animation with tw-animate-css |
 | FilledInput | Input | - |
 | FormControl | div | - |
+| FormControlLabel | div + control + Label | the control (Checkbox/Switch/Radio) is converted inline |
 | FormGroup | div | - |
 | FormHelperText | p | - |
 | FormLabel | Label | - |
@@ -93,9 +101,11 @@ Legend: **Full** = structurally fully converted. **In parent** = converted autom
 | TableFooter | TableFooter | - |
 | TableHead | TableHeader (+ TableHead cells) | - |
 | TableRow | TableRow | - |
+| TableSortLabel | button + sort icon | active/direction dropped; wire sorting manually |
 | Tabs | Tabs + TabsList/TabsTrigger | panels live outside Tabs in MUI; add TabsContent |
 | TextareaAutosize | Textarea | - |
 | TextField | Label + Input/Textarea | - |
+| Timeline | ul + li/div/span (semantic) | best-effort semantic markup; review the layout |
 | ToggleButtonGroup | ToggleGroup + ToggleGroupItem | - |
 | Toolbar | div | - |
 | Tooltip | Tooltip + Provider/Trigger/Content | Base UI: replace asChild with the render prop |
@@ -108,7 +118,6 @@ Legend: **Full** = structurally fully converted. **In parent** = converted autom
 | --- | --- | --- |
 | AccordionDetails | AccordionContent (in Accordion) | only inside its parent |
 | AccordionSummary | AccordionTrigger (in Accordion) | only inside its parent |
-| FormControlLabel | div + RadioGroupItem + Label (in RadioGroup) | only inside its parent |
 | Radio | RadioGroupItem (in RadioGroup) | only inside its parent |
 | Tab | TabsTrigger (in Tabs) | only inside its parent |
 | TabList | TabsList (in TabContext) | only inside its parent |
@@ -132,4 +141,4 @@ Legend: **Full** = structurally fully converted. **In parent** = converted autom
 | BottomNavigationAction | BottomNavigationAction has no equivalent; use a Link/Button in the navigation bar |
 | DataGrid | DataGrid -> shadcn Table + @tanstack/react-table (Data Table recipe); needs columns/hooks, so build it manually (shadcn add table; npm i @tanstack/react-table) |
 | SpeedDial | SpeedDial has no equivalent; use DropdownMenu or custom floating actions |
-| Timeline | Timeline has no equivalent; build it manually with flex/grid |
+| TablePagination | TablePagination -> shadcn Pagination + rows-per-page state; build it manually (shadcn add pagination select) |

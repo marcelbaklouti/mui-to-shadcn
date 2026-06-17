@@ -76,17 +76,17 @@ console.log(result.text, result.warnings, result.manual, result.components);
 
 ## Component support
 
-106 MUI components are catalogued. As of the current version: **89 fully converted**, **8 converted inside their parent**, **4 partial**, **5 left manual** with a note. The full, always-current table is generated from the registry:
+115 MUI components are catalogued. As of the current version: **99 fully converted**, **7 converted inside their parent**, **4 partial**, **5 left manual** with a note. The full, always-current table is generated from the registry:
 
 - [docs/COMPONENTS.md](./docs/COMPONENTS.md) — full status table (regenerate with `npm run docs`)
 
-Fully converted include Button, IconButton, Checkbox, Switch, RadioGroup, TextField, Select, the Form/Input primitives, Divider, LinearProgress, CircularProgress (lucide spinner), Skeleton, Paper, the Card family, Alert, Link, Typography, Avatar, Chip, Badge, Tooltip, Tabs (incl. the MUI Lab TabContext/TabList/TabPanel), Accordion, Dialog, Modal, Menu (DropdownMenu), Popover/Popper, Collapse (Collapsible), ToggleButtonGroup, Drawer/SwipeableDrawer (Sheet), Breadcrumbs, Pagination, the Table family, the List family, the Stepper family, Rating (lucide stars), the Transition components (unwrapped), Fab, AppBar/Toolbar, ImageList, and Box/Stack/Container.
+Fully converted include Button, IconButton, ButtonBase, Checkbox, Switch, RadioGroup, FormControlLabel (control converted inline), TextField, Select, the Form/Input primitives, Divider, LinearProgress, CircularProgress (lucide spinner), Skeleton, Paper, the Card family (incl. CardMedia, CardActionArea), Alert, Link, Typography, Avatar, Chip, Badge, Tooltip, Tabs (incl. the MUI Lab TabContext/TabList/TabPanel), Accordion, Dialog (incl. standalone parts), Modal, Menu (DropdownMenu), Popover/Popper, Collapse (Collapsible), ToggleButtonGroup, Drawer/SwipeableDrawer (Sheet), Breadcrumbs, Pagination, the Table family (incl. TableSortLabel), the List family, the Stepper family, the Timeline family (semantic markup), Rating (lucide stars), the Transition components (unwrapped), Fab, AppBar/Toolbar, ImageList, and Box/Stack/Container.
 
 Plus icons: `@mui/icons-material` → `lucide-react` (~700 names mapped).
 
 Partial (best-effort, needs review): Grid / Grid2 / GridLegacy (real CSS grid; `size="grow"`/`"auto"` are flagged) and Slider.
 
-Still manual on purpose (different paradigm or no shadcn equivalent, with a recipe in the report): DataGrid (TanStack Table + shadcn Table), Autocomplete (Combobox = Popover + Command), SpeedDial, Timeline, and BottomNavigationAction. These need React state/hooks the codemod can't safely synthesize, so it leaves your working code in place rather than emit a build-breaking stub.
+Still manual on purpose (different paradigm or no shadcn equivalent, with a recipe in the report): DataGrid (TanStack Table + shadcn Table), Autocomplete (Combobox = Popover + Command), TablePagination (Pagination + rows-per-page state), SpeedDial, and BottomNavigationAction. These need React state/hooks the codemod can't safely synthesize, so it leaves your working code in place rather than emit a build-breaking stub.
 
 ## What the tool does not do
 

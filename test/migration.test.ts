@@ -458,3 +458,92 @@ test("Button href becomes asChild with an anchor", () => {
   );
   assert.match(result.text, /<Button asChild><a href="\/home">Home<\/a><\/Button>/);
 });
+
+test("FormControlLabel with a Checkbox control becomes div + Checkbox + Label", () => {
+  const result = migrate(
+    'import { FormControlLabel, Checkbox } from "@mui/material";\nexport const A = () => <FormControlLabel control={<Checkbox checked={v} onChange={h} />} label="Remember me" />;\n',
+  );
+  assert.match(result.text, /<div className="flex items-center gap-2">/);
+  assert.match(result.text, /<Checkbox id="remember-me" checked=\{v\} onCheckedChange=\{h\} \/>/);
+  assert.match(result.text, /<Label htmlFor="remember-me">Remember me<\/Label>/);
+  assert.match(result.text, /from "@\/components\/ui\/checkbox"/);
+  assert.doesNotMatch(result.text, /@mui\/material/);
+});
+
+test("FormControlLabel with a Radio control becomes RadioGroupItem + Label", () => {
+  const result = migrate(
+    'import { FormControlLabel, Radio } from "@mui/material";\nexport const A = () => <FormControlLabel value="a" control={<Radio />} label="Option A" />;\n',
+  );
+  assert.match(result.text, /<RadioGroupItem value="a" id="a" \/>/);
+  assert.match(result.text, /<Label htmlFor="a">Option A<\/Label>/);
+  assert.match(result.text, /from "@\/components\/ui\/radio-group"/);
+});
+
+test("standalone Dialog parts map to shadcn dialog parts", () => {
+  const result = migrate(
+    'import { DialogTitle, DialogContentText, DialogActions } from "@mui/material";\nexport const A = () => (<div><DialogTitle>Title</DialogTitle><DialogContentText>Desc</DialogContentText><DialogActions>x</DialogActions></div>);\n',
+  );
+  assert.match(result.text, /<DialogTitle>Title<\/DialogTitle>/);
+  assert.match(result.text, /<DialogDescription>Desc<\/DialogDescription>/);
+  assert.match(result.text, /<DialogFooter>x<\/DialogFooter>/);
+  assert.match(result.text, /from "@\/components\/ui\/dialog"/);
+});
+
+test("ButtonBase becomes a native button", () => {
+  const result = migrate(
+    'import { ButtonBase } from "@mui/material";\nexport const A = () => <ButtonBase onClick={go} focusRipple>Click</ButtonBase>;\n',
+  );
+  assert.match(result.text, /<button onClick=\{go\}>Click<\/button>/);
+  assert.doesNotMatch(result.text, /focusRipple/);
+});
+
+test("CardActionArea becomes a clickable button", () => {
+  const result = migrate(
+    'import { CardActionArea } from "@mui/material";\nexport const A = () => <CardActionArea onClick={go}>content</CardActionArea>;\n',
+  );
+  assert.match(result.text, /<button onClick=\{go\} className="w-full text-left">content<\/button>/);
+});
+
+test("CardMedia with an image becomes an img", () => {
+  const result = migrate(
+    'import { CardMedia } from "@mui/material";\nexport const A = () => <CardMedia component="img" image="/p.jpg" alt="P" height={140} />;\n',
+  );
+  assert.match(result.text, /<img src="\/p.jpg" alt="P" className="h-\[140px\] w-full object-cover" \/>/);
+});
+
+test("TableSortLabel becomes a button with a sort icon", () => {
+  const result = migrate(
+    'import { TableSortLabel } from "@mui/material";\nexport const A = () => <TableSortLabel active direction="asc" onClick={sort}>Name</TableSortLabel>;\n',
+  );
+  assert.match(result.text, /<button onClick=\{sort\} className="inline-flex items-center gap-1">Name <ChevronsUpDown className="size-4" \/><\/button>/);
+  assert.match(result.text, /import \{ ChevronsUpDown \} from "lucide-react"/);
+  assert.ok(result.warnings.some((warning) => warning.includes("sorting state")));
+});
+
+test("Timeline family becomes semantic markup", () => {
+  const result = migrate(
+    'import { Timeline, TimelineItem, TimelineSeparator, TimelineDot, TimelineConnector, TimelineContent } from "@mui/lab";\nexport const A = () => (\n  <Timeline>\n    <TimelineItem>\n      <TimelineSeparator>\n        <TimelineDot />\n        <TimelineConnector />\n      </TimelineSeparator>\n      <TimelineContent>Step 1</TimelineContent>\n    </TimelineItem>\n  </Timeline>\n);\n',
+  );
+  assert.match(result.text, /<ul className="flex flex-col">/);
+  assert.match(result.text, /<li className="flex gap-4">/);
+  assert.match(result.text, /<span className="size-3 rounded-full bg-primary" \/>/);
+  assert.match(result.text, /<span className="w-px grow bg-border" \/>/);
+  assert.match(result.text, /<div className="flex-1 pb-4">Step 1<\/div>/);
+  assert.doesNotMatch(result.text, /@mui\/lab/);
+});
+
+test("standalone ToggleButton becomes Toggle", () => {
+  const result = migrate(
+    'import { ToggleButton } from "@mui/material";\nexport const A = () => <ToggleButton value="bold" onClick={go}>B</ToggleButton>;\n',
+  );
+  assert.match(result.text, /<Toggle onClick=\{go\}>B<\/Toggle>/);
+  assert.match(result.text, /from "@\/components\/ui\/toggle"/);
+});
+
+test("standalone Radio becomes RadioGroupItem with a warning", () => {
+  const result = migrate(
+    'import { Radio } from "@mui/material";\nexport const A = () => <Radio value="x" color="primary" />;\n',
+  );
+  assert.match(result.text, /<RadioGroupItem value="x" \/>/);
+  assert.ok(result.warnings.some((warning) => warning.includes("RadioGroup")));
+});
