@@ -1,0 +1,29 @@
+name: Publish to npm
+
+# Publishes when you create a GitHub Release. Uses npm Trusted Publishing (OIDC):
+# no NPM_TOKEN secret is needed, and provenance is attached automatically.
+# Prerequisites (one-time): the package must already exist on npm, and a Trusted
+# Publisher for this repo + workflow must be configured at
+# https://www.npmjs.com/package/mui-to-shadcn/access
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write # required to mint the OIDC token + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+          registry-url: "https://registry.npmjs.org"
+      - run: npm install -g npm@latest # ensure npm >= 11.5.1 for OIDC trusted publishing
+      - run: npm ci
+      # prepublishOnly runs clean + build + test before the actual publish.
+      - run: npm publish --provenance
