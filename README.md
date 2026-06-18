@@ -28,6 +28,9 @@ npx mui-to-shadcn src --report
 
 # write the changes
 npx mui-to-shadcn src --write
+
+# write the changes, plus a MIGRATION.md handoff for an LLM to finish the rest
+npx mui-to-shadcn src --write --md
 ```
 
 Or as a one-command setup in your project (installs the shadcn components, then migrates):
@@ -53,6 +56,7 @@ mui-to-shadcn <path...> [options]
 
 --write        write changes (default is a dry run)
 --report       print every warning and manual item
+--md           write MIGRATION.md — an LLM-ready handoff for the remaining manual work
 --skip-sx      skip the sx / system-props pass
 --setup        install shadcn components and run the full pipeline
 --base <b>     radix (default) or base (Base UI)
@@ -73,6 +77,8 @@ const file = project.addSourceFileAtPath("Component.tsx");
 const result = runMigration(file, { base: "radix" });
 console.log(result.text, result.warnings, result.manual, result.components);
 ```
+
+`buildMigrationDoc({ files, components, base, version, generatedAt })` is also exported, if you want to generate the same `MIGRATION.md` report from your own tooling.
 
 ## Component support
 
@@ -98,6 +104,27 @@ Even with `--setup`, some work needs human judgement:
 - **Layout and visuals**: Grid maps to CSS grid best-effort and nested whitespace is not perfect, so review the result.
 
 Radix or Base UI: the generated JSX uses the public shadcn API (`@/components/ui/*`, `onValueChange`, `type single/multiple`, `AccordionItem`), which is identical across both; only the underlying primitives differ.
+
+## Finish with an LLM
+
+The codemod does the mechanical part; the rest needs judgement. Run with `--md` and it writes a single **`MIGRATION.md`** — a focused handoff you can give to the LLM of your choice (Claude, ChatGPT, Cursor, …):
+
+```bash
+npx mui-to-shadcn src --write --md
+```
+
+`MIGRATION.md` holds exactly what an assistant needs, and no more:
+
+- a short **task brief** written to the assistant (target stack, Radix vs Base UI rules, "don't reintroduce `@mui/*`", keep behavior identical);
+- the **shadcn components to install**;
+- **Open / broken** — every component the codemod left for you, grouped by file with the line, the component, and a concrete recipe (e.g. `Autocomplete` → Combobox, `DataGrid` → TanStack Table);
+- **Review** — auto-changes worth a second look (renamed handlers, single-select `Select`, …).
+
+Then hand it over, for example:
+
+> Read `MIGRATION.md` and complete every task it lists. Keep the existing behavior.
+
+Only files with remaining work appear, so the report stays small even on large codebases.
 
 ## Compatibility
 

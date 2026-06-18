@@ -10,6 +10,9 @@ import { iconsFile } from "./icons.js";
 import { infraFile } from "./infra.js";
 import { handlersFile } from "./handlers.js";
 
+export { buildMigrationDoc } from "./migration-doc.js";
+export type { MigrationDocInput, FileReport } from "./migration-doc.js";
+
 export interface MigrationResult {
   changed: boolean;
   text: string;

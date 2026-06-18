@@ -4,6 +4,13 @@ All notable changes to this project are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-18
+
+### Added
+
+- **`--md` flag** — writes a `MIGRATION.md` handoff so the LLM of your choice (Claude, ChatGPT, Cursor, …) can finish what the codemod cannot do on its own. It lists, per file, every **Open / broken** item (file · line · component · what's needed, with the recipe inline) and a **Review** list of auto-changes to verify, behind a short context block addressed directly to the assistant (target stack, Radix vs Base UI, Tailwind v4, controlled-value rules). Works in both dry-run and `--write`; the CLI hints to use `--md` whenever manual work remains. Manual components are no longer echoed into the Review section.
+- Programmatic `buildMigrationDoc` (with `FileReport` / `MigrationDocInput` types), re-exported from the package entry, so the same report can be produced from the API.
+
 ## [0.2.0] - 2026-06-17
 
 Driven by a real-world audit (2289 files): converts the most common remaining manual components. Catalogue grows to 115 (99 full, 7 in parent, 4 partial, 5 manual).
