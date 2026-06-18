@@ -13,6 +13,7 @@ npm install
 ```
 npm run migrate -- <pfad> --report     # Probelauf, schreibt nichts, listet benoetigte shadcn-Komponenten
 npm run migrate -- <pfad> --write       # schreibt Aenderungen in die Dateien
+npm run migrate -- <pfad> --md          # schreibt MIGRATION.md (LLM-Handoff fuer die restliche Handarbeit)
 npm run migrate -- <pfad> --skip-sx     # ueberspringt den sx/System-Props-Pass
 ```
 
@@ -76,3 +77,24 @@ npx eslint --fix <pfad>
 ```
 
 Der Report zeigt geaenderte Handler-Signaturen und alle manuell zu pruefenden Stellen.
+
+## Mit einem LLM abschliessen
+
+Den mechanischen Teil erledigt das Tool; der Rest braucht Urteilsvermoegen. Mit `--md` wird eine einzige Datei **`MIGRATION.md`** geschrieben — ein kompakter Handoff fuer das LLM deiner Wahl (Claude, ChatGPT, Cursor, …):
+
+```
+npx mui-to-shadcn src --write --md
+```
+
+`MIGRATION.md` enthaelt genau das, was ein Assistent braucht — nicht mehr und nicht weniger:
+
+- einen kurzen **Auftrag** direkt an den Assistenten (Zielstack, Radix vs. Base UI, kein `@mui/*` reimportieren, Verhalten beibehalten);
+- die zu installierenden **shadcn-Komponenten**;
+- **Open / broken** — jede Komponente, die das Tool offen gelassen hat, gruppiert nach Datei mit Zeile, Komponente und konkretem Rezept (z. B. `Autocomplete` → Combobox);
+- **Review** — automatische Aenderungen, die man pruefen sollte (umbenannte Handler, Single-Select `Select`, …).
+
+Dann uebergeben, z. B.:
+
+> Lies `MIGRATION.md` und erledige jede dort aufgefuehrte Aufgabe. Behalte das bestehende Verhalten bei.
+
+Nur Dateien mit offener Arbeit erscheinen, die Datei bleibt also auch bei grossen Codebasen klein.

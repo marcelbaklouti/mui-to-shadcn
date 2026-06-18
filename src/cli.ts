@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
 import { writeFileSync } from "node:fs";
-import { relative } from "node:path";
+import { relative, join } from "node:path";
+import { createRequire } from "node:module";
 import { Project } from "ts-morph";
 import { runMigration } from "./run.js";
 import { collectSourceFiles } from "./paths.js";
 import { runSetup } from "./setup.js";
 import type { PackageManager } from "./setup.js";
+import { buildMigrationDoc } from "./migration-doc.js";
+import type { FileReport } from "./migration-doc.js";
 
 function parseBase(value: string | undefined): "radix" | "base" {
   return value === "base" ? "base" : "radix";
@@ -17,12 +20,22 @@ function parsePackageManager(value: string | undefined): PackageManager | undefi
   return undefined;
 }
 
+function readVersion(): string {
+  try {
+    const pkg = createRequire(import.meta.url)("../package.json") as { version?: string };
+    return pkg.version ?? "";
+  } catch {
+    return "";
+  }
+}
+
 function main(): void {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
     options: {
       write: { type: "boolean", default: false },
       report: { type: "boolean", default: false },
+      md: { type: "boolean", default: false },
       "skip-sx": { type: "boolean", default: false },
       setup: { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
@@ -33,7 +46,7 @@ function main(): void {
 
   if (positionals.length === 0) {
     console.error(
-      "Usage: mui-to-shadcn <path...> [--write] [--report] [--skip-sx] [--setup [--base radix|base] [--pm pnpm|npm|yarn|bun] [--dry-run]]",
+      "Usage: mui-to-shadcn <path...> [--write] [--report] [--md] [--skip-sx] [--setup [--base radix|base] [--pm pnpm|npm|yarn|bun] [--dry-run]]",
     );
     process.exit(1);
   }
@@ -66,11 +79,13 @@ function main(): void {
 
   const write = values.write === true;
   const report = values.report === true;
+  const md = values.md === true;
 
   let changedCount = 0;
   let warningCount = 0;
   const manualTotals = new Map<string, number>();
   const components = new Set<string>();
+  const reports: FileReport[] = [];
 
   for (const file of files) {
     const result = runMigration(file, { sx: applySx, base });
@@ -79,6 +94,9 @@ function main(): void {
     for (const slug of result.components) components.add(slug);
     for (const hit of result.manual) {
       manualTotals.set(hit.component, (manualTotals.get(hit.component) ?? 0) + 1);
+    }
+    if (result.manual.length || result.warnings.length) {
+      reports.push({ file: rel, manual: result.manual, warnings: result.warnings });
     }
 
     if (result.changed) {
@@ -118,6 +136,28 @@ function main(): void {
     console.log("Migrate manually:");
     const sorted = [...manualTotals].sort((a, b) => b[1] - a[1]);
     for (const [name, count] of sorted) console.log(`  ${name}: ${count}`);
+  }
+
+  if (md) {
+    const doc = buildMigrationDoc({
+      files: reports,
+      components: componentList,
+      base,
+      version: readVersion(),
+      generatedAt: new Date().toISOString().slice(0, 10),
+    });
+    writeFileSync(join(process.cwd(), "MIGRATION.md"), doc);
+    const taskTotal = reports.reduce((sum, r) => sum + r.manual.length, 0);
+    const reviewTotal = reports.reduce((sum, r) => sum + r.warnings.length, 0);
+    console.log("");
+    console.log(
+      `Wrote MIGRATION.md (${taskTotal} task${taskTotal === 1 ? "" : "s"}, ` +
+        `${reviewTotal} review note${reviewTotal === 1 ? "" : "s"} across ` +
+        `${reports.length} file${reports.length === 1 ? "" : "s"}).`,
+    );
+    console.log('Hand it to the LLM of your choice: "Read MIGRATION.md and complete the migration tasks it lists."');
+  } else if (warningCount > 0 || manualTotals.size > 0) {
+    console.log("Write an LLM-ready handoff with --md (MIGRATION.md).");
   }
 
   if (!report && (warningCount > 0 || manualTotals.size > 0)) {
