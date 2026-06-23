@@ -307,14 +307,12 @@ export function radioGroupContainer(context: ContainerContext): ContainerEdit[] 
 
 export function dialogContainer(context: ContainerContext): ContainerEdit[] {
   const { element, node, indent } = context;
-  context.registerImport({
-    names: ["Dialog", "DialogContent", "DialogDescription", "DialogFooter", "DialogHeader", "DialogTitle"],
-    moduleSpecifier: "@/components/ui/dialog",
-  });
   if (attribute(element, "onClose")) {
     context.warn("Dialog onClose -> onOpenChange; the handler now receives a boolean instead of (event, reason)");
   }
-  context.warn("wrap DialogTitle and DialogDescription in a DialogHeader manually");
+  if (attribute(element, "slotProps") || attribute(element, "slots") || attribute(element, "PaperProps")) {
+    context.warn("Dialog slotProps/PaperProps dropped; apply paper styling via className on DialogContent");
+  }
 
   const rootAttributes = renderRootAttributes(element, {
     context,
@@ -329,6 +327,8 @@ export function dialogContainer(context: ContainerContext): ContainerEdit[] {
       "BackdropProps",
       "disableEscapeKeyDown",
       "keepMounted",
+      "slotProps",
+      "slots",
     ]),
   });
 
@@ -340,18 +340,23 @@ export function dialogContainer(context: ContainerContext): ContainerEdit[] {
     "</Dialog>",
   );
 
+  // Import only the dialog parts we actually emit, so the file is free of unused imports.
+  const used = new Set<string>(["Dialog", "DialogContent"]);
   for (const descendant of descendantJsxElements(node)) {
     const canonical = context.localToCanonical.get(getTagName(descendant));
     if (canonical === "DialogTitle") {
       edits.push(...renameTagEdits(descendant, "DialogTitle"));
+      used.add("DialogTitle");
       context.consume(descendant);
       context.markConverted("DialogTitle");
     } else if (canonical === "DialogContentText") {
       edits.push(...renameTagEdits(descendant, "DialogDescription"));
+      used.add("DialogDescription");
       context.consume(descendant);
       context.markConverted("DialogContentText");
     } else if (canonical === "DialogActions") {
       edits.push(...renameTagEdits(descendant, "DialogFooter"));
+      used.add("DialogFooter");
       context.consume(descendant);
       context.markConverted("DialogActions");
     } else if (canonical === "DialogContent") {
@@ -362,6 +367,11 @@ export function dialogContainer(context: ContainerContext): ContainerEdit[] {
       context.consume(descendant);
       context.markConverted("DialogContent");
     }
+  }
+
+  context.registerImport({ names: [...used], moduleSpecifier: "@/components/ui/dialog" });
+  if (used.has("DialogTitle")) {
+    context.warn("optional: wrap DialogTitle (and any DialogDescription) in a DialogHeader for shadcn spacing");
   }
   return edits;
 }

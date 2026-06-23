@@ -6,6 +6,21 @@ function findAttribute(context: CompositeContext, name: string): ParsedAttribute
   return context.element.attributes.find((attribute) => attribute.name === name);
 }
 
+// The JSX tag to use for a polymorphic `component` prop: a string literal ("a", "span"),
+// or a component identifier / dotted member ({NextLink}, {motion.a}). Anything more dynamic
+// (a call, a ternary) can't be turned into a tag, so this returns null.
+function polymorphicTag(value: AttributeValue | undefined): string | null {
+  if (!value) return null;
+  if (value.kind === "string") {
+    return /^[A-Za-z][\w-]*$/.test(value.value) ? value.value : null;
+  }
+  if (value.kind === "expression") {
+    const expression = value.expression.trim();
+    return /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(expression) ? expression : null;
+  }
+  return null;
+}
+
 function renderRemainingAttributes(context: CompositeContext, consumed: Set<string>): string {
   const parts: string[] = [];
   for (const attribute of context.element.attributes) {
@@ -262,12 +277,16 @@ export const buttonTransform: CompositeTransform = (context) => {
   if (findAttribute(context, "fullWidth")) classes.push("w-full");
 
   const hrefAttribute = findAttribute(context, "href");
-  let asChild = false;
-  if (hrefAttribute) asChild = true;
-  if (findAttribute(context, "component")) {
-    asChild = true;
-    context.warn("Button component -> asChild; wrap the polymorphic element as the single child");
+  const componentAttribute = findAttribute(context, "component");
+  // Wrap with the polymorphic component when given (e.g. component={NextLink}), else an
+  // anchor when there's only an href. A dynamic component can't become a tag, so warn.
+  const wrapperTag = polymorphicTag(componentAttribute?.value) ?? (hrefAttribute ? "a" : null);
+  if (componentAttribute && wrapperTag !== "a") {
+    context.warn("Button component -> asChild; the element is wrapped as the single child");
+  } else if (componentAttribute) {
+    context.warn("Button component is dynamic; wrap it as the single asChild child manually");
   }
+  const asChild = wrapperTag !== null;
   if (asChild) leading.push("asChild");
 
   const startIcon = findAttribute(context, "startIcon");
@@ -276,7 +295,10 @@ export const buttonTransform: CompositeTransform = (context) => {
   let children = [startIcon ? iconChild(startIcon.value) : "", inner, endIcon ? iconChild(endIcon.value) : ""]
     .filter(Boolean)
     .join(" ");
-  if (hrefAttribute) children = `<a href=${renderAttributeValue(hrefAttribute.value)}>${children}</a>`;
+  if (wrapperTag) {
+    const hrefText = hrefAttribute ? ` href=${renderAttributeValue(hrefAttribute.value)}` : "";
+    children = `<${wrapperTag}${hrefText}>${children}</${wrapperTag}>`;
+  }
 
   const classText = buildClassName(context, consumed, classes);
   const remaining = renderRemainingAttributes(context, consumed);

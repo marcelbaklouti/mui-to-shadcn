@@ -4,6 +4,24 @@ All notable changes to this project are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-23
+
+Makes `--setup` actually finish on a real MUI project. Previously `shadcn init` aborted on its Tailwind preflight (an MUI/Emotion app has no Tailwind), and the init command used a flag the CLI does not accept.
+
+### Added
+
+- **Interactive wizard.** Running `npx mui-to-shadcn` with no path in a terminal now starts a guided flow: it asks for the target folder, what to do (full setup / convert only / preview), the base (Radix vs Base UI), the shadcn style and whether to write the `MIGRATION.md` handoff — with links to the docs — then shows a full review (resolved preset, package manager, components, Tailwind actions, every command) and only runs after you confirm. Press Enter to accept the sensible defaults at each step. Built on `@clack/prompts`.
+- **Selectable shadcn style.** `--style vega|nova|maia|lyra|mira` (default `vega`, the classic look) chooses the visual style; the setup passes `--preset {base}-{style}` (e.g. `radix-vega`) to `shadcn init`. `--preset <name|code>` takes a named preset or a [ui.shadcn.com](https://ui.shadcn.com/create) code verbatim, overriding base+style.
+- **Automatic Tailwind CSS v4 setup in `--setup`.** When a project has no Tailwind at all — the normal state of an MUI app — the setup now installs `tailwindcss`/`@tailwindcss/postcss`, adds `@import "tailwindcss"` to the global stylesheet (an existing `globals.css`/`index.css`, or a new one under the detected `app`/`src` directory), and creates `postcss.config.mjs`. This runs before `shadcn init` so its Tailwind preflight passes. Next.js and Vite are detected; an existing PostCSS config is never overwritten (a note is printed instead). Skip it with `--skip-tailwind`. A project that already ships Tailwind is left untouched.
+- **MIGRATION.md is now part of `--setup` and the wizard.** The `MIGRATION.md` LLM handoff (added in 0.3.0) is written automatically at the end of a setup/wizard run whenever manual work remains — no separate `--md` step needed. Opt out with `--skip-md`.
+
+### Fixed
+
+- **`shadcn init` is now non-interactive and selects the right primitives.** The init step used `--base radix|base`, which the shadcn CLI does not accept (it left init prompting for a preset). It now passes a real preset (`--preset radix-vega` / `base-vega`, or whatever `--style` resolves to), the documented way to choose Radix vs. Base UI.
+- **`Button component={CustomLink}` keeps the component.** The polymorphic `component` (e.g. a Next.js/i18n `Link`) is now used as the `asChild` wrapper — `<Button asChild><CustomLink href=…>…</CustomLink></Button>` — instead of being replaced with a bare `<a>` (which dropped the component and left its import unused). String tags (`component="a"`) and a plain `href` still produce an anchor; a dynamic `component` expression is flagged for manual handling.
+- **`Dialog` drops MUI-only `slotProps`/`slots`/`PaperProps`** instead of leaving them on the shadcn `Dialog` (which rejects them), with a note to move paper styling to `className` on `DialogContent`.
+- **`Dialog` imports only the parts it emits.** `DialogHeader`/`DialogDescription` are no longer imported when the source has no matching content, removing unused imports from the output.
+
 ## [0.3.0] - 2026-06-18
 
 ### Added
