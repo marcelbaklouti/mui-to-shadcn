@@ -199,6 +199,19 @@ test("Dialog is converted structurally", () => {
   assert.match(result.text, /<Button>OK<\/Button>/);
 });
 
+test("Dialog drops slotProps and imports only the parts it emits", () => {
+  const result = migrate(
+    'import { Dialog, DialogTitle, DialogContent } from "@mui/material";\nexport const A = () => (\n  <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" slotProps={{ paper: { sx: { borderRadius: 3 } } }}>\n    <DialogTitle>T</DialogTitle>\n    <DialogContent>body</DialogContent>\n  </Dialog>\n);\n',
+  );
+  assert.match(result.text, /<Dialog open=\{open\} onOpenChange=\{onClose\}>/);
+  assert.doesNotMatch(result.text, /slotProps/);
+  assert.doesNotMatch(result.text, /fullWidth|maxWidth/);
+  // No DialogActions / DialogContentText here, so those names must not be imported.
+  assert.match(result.text, /import \{ Dialog, DialogContent, DialogTitle \} from "@\/components\/ui\/dialog"/);
+  assert.doesNotMatch(result.text, /DialogHeader|DialogDescription|DialogFooter/);
+  assert.ok(result.warnings.some((w) => w.includes("slotProps/PaperProps dropped")));
+});
+
 test("ToggleButtonGroup becomes ToggleGroup with items", () => {
   const result = migrate(
     'import { ToggleButtonGroup, ToggleButton } from "@mui/material";\nexport const A = () => (\n  <ToggleButtonGroup value={v} exclusive onChange={h}>\n    <ToggleButton value="left">L</ToggleButton>\n  </ToggleButtonGroup>\n);\n',
@@ -457,6 +470,24 @@ test("Button href becomes asChild with an anchor", () => {
     'import { Button } from "@mui/material";\nexport const A = () => <Button href="/home" variant="contained">Home</Button>;\n',
   );
   assert.match(result.text, /<Button asChild><a href="\/home">Home<\/a><\/Button>/);
+});
+
+test("Button component={CustomLink} wraps the component, not a bare anchor", () => {
+  const result = migrate(
+    'import { Button } from "@mui/material";\nimport { I18nLink } from "@/lib/link";\nexport const A = () => <Button component={I18nLink} href="/p" variant="contained" endIcon={<Arrow />}>Go</Button>;\n',
+  );
+  assert.match(
+    result.text,
+    /<Button asChild><I18nLink href="\/p">Go <Arrow \/><\/I18nLink><\/Button>/,
+  );
+  assert.doesNotMatch(result.text, /<a href/);
+});
+
+test("Button component as a string literal becomes that tag", () => {
+  const result = migrate(
+    'import { Button } from "@mui/material";\nexport const A = () => <Button component="a" href="/x" variant="contained">X</Button>;\n',
+  );
+  assert.match(result.text, /<Button asChild><a href="\/x">X<\/a><\/Button>/);
 });
 
 test("FormControlLabel with a Checkbox control becomes div + Checkbox + Label", () => {

@@ -20,6 +20,14 @@ function parsePackageManager(value: string | undefined): PackageManager | undefi
   return undefined;
 }
 
+const KNOWN_STYLES = new Set(["vega", "nova", "maia", "lyra", "mira"]);
+
+function parseStyle(value: string | undefined): string {
+  if (value && KNOWN_STYLES.has(value)) return value;
+  // Unknown but explicit styles are passed through (forward-compatible); default is vega.
+  return value?.trim() || "vega";
+}
+
 function readVersion(): string {
   try {
     const pkg = createRequire(import.meta.url)("../package.json") as { version?: string };
@@ -29,7 +37,7 @@ function readVersion(): string {
   }
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
     options: {
@@ -38,15 +46,28 @@ function main(): void {
       md: { type: "boolean", default: false },
       "skip-sx": { type: "boolean", default: false },
       setup: { type: "boolean", default: false },
+      "skip-tailwind": { type: "boolean", default: false },
+      "skip-md": { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
       base: { type: "string" },
+      style: { type: "string" },
+      preset: { type: "string" },
       pm: { type: "string" },
     },
   });
 
   if (positionals.length === 0) {
+    // Bare `npx mui-to-shadcn` on a terminal launches the guided wizard.
+    if (process.stdin.isTTY && process.stdout.isTTY) {
+      const { runWizard } = await import("./wizard.js");
+      process.exit(await runWizard(process.cwd()));
+    }
     console.error(
-      "Usage: mui-to-shadcn <path...> [--write] [--report] [--md] [--skip-sx] [--setup [--base radix|base] [--pm pnpm|npm|yarn|bun] [--dry-run]]",
+      "Usage: mui-to-shadcn <path...> [--write] [--report] [--md] [--skip-sx]\n" +
+        "       [--setup [--base radix|base] [--style vega|nova|maia|lyra|mira] [--preset <name|code>]\n" +
+        "                [--pm pnpm|npm|yarn|bun] [--skip-tailwind] [--skip-md] [--dry-run]]\n" +
+        "\n" +
+        "Run with no path in a terminal to start the interactive wizard.",
     );
     process.exit(1);
   }
@@ -58,9 +79,13 @@ function main(): void {
     const status = runSetup({
       target: positionals,
       base,
+      style: parseStyle(values.style as string | undefined),
+      preset: (values.preset as string | undefined)?.trim() || undefined,
       packageManager: parsePackageManager(values.pm as string | undefined),
       dryRun: values["dry-run"] === true,
       skipSx: !applySx,
+      skipTailwind: values["skip-tailwind"] === true,
+      writeMd: values["skip-md"] !== true,
       cwd: process.cwd(),
     });
     process.exit(status);
@@ -165,4 +190,7 @@ function main(): void {
   }
 }
 
-main();
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

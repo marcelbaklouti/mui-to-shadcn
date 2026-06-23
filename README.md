@@ -20,7 +20,13 @@ Several passes over your `.ts`/`.tsx` files, designed to leave as little manual 
 
 ## Quick start
 
-Run it without installing:
+The simplest way is the guided wizard — run it with no arguments and it walks you through the few decisions (target, Radix vs Base UI, shadcn style, and the `MIGRATION.md` LLM handoff), shows a full review, and only runs once you confirm:
+
+```bash
+npx mui-to-shadcn
+```
+
+Prefer flags? Run it directly without installing:
 
 ```bash
 # dry run, prints the changes and the shadcn components it needs
@@ -36,23 +42,29 @@ npx mui-to-shadcn src --write --md
 Or as a one-command setup in your project (installs the shadcn components, then migrates):
 
 ```bash
-npx mui-to-shadcn src --setup --base radix   # or --base base for Base UI
+npx mui-to-shadcn src --setup --base radix --style vega   # base: radix|base, style: vega|nova|maia|lyra|mira
 ```
 
 `--setup` will, in your project directory:
 
 1. collect every shadcn component the migration needs,
-2. run `shadcn init` (only if there is no `components.json`),
-3. run `shadcn add <components>`,
-4. write the converted files,
-5. run `prettier --write`.
+2. set up Tailwind CSS v4 if it is missing — install `tailwindcss`/`@tailwindcss/postcss`, add `@import "tailwindcss"` to your global stylesheet, and create `postcss.config.mjs` (skip with `--skip-tailwind`),
+3. run `shadcn init` (only if there is no `components.json`),
+4. run `shadcn add <components>`,
+5. write the converted files,
+6. run `prettier --write`,
+7. write `MIGRATION.md` — the LLM handoff for whatever needs manual work (skip with `--skip-md`).
+
+Step 2 exists because `shadcn init` aborts with `TAILWIND_NOT_CONFIGURED` on a project that has no Tailwind — the normal state of an MUI/Emotion app. The setup only touches projects with no Tailwind at all; one that already ships Tailwind is left untouched. Next.js and Vite are detected automatically (for Vite the official `@tailwindcss/vite` plugin is noted as an alternative).
 
 The package manager is detected from your lockfile (override with `--pm pnpm|npm|yarn|bun`). Use `--dry-run` to print the planned commands without running anything.
 
 ## CLI
 
 ```
-mui-to-shadcn <path...> [options]
+mui-to-shadcn [path...] [options]
+
+(no path, in a terminal)   start the interactive wizard
 
 --write        write changes (default is a dry run)
 --report       print every warning and manual item
@@ -60,11 +72,15 @@ mui-to-shadcn <path...> [options]
 --skip-sx      skip the sx / system-props pass
 --setup        install shadcn components and run the full pipeline
 --base <b>     radix (default) or base (Base UI)
+--style <s>    vega (default) | nova | maia | lyra | mira
+--preset <p>   a preset name or ui.shadcn.com code; overrides --base/--style
 --pm <m>       pnpm | npm | yarn | bun (otherwise auto-detected)
+--skip-tailwind with --setup: do not set up Tailwind CSS automatically
+--skip-md      with --setup: do not write MIGRATION.md
 --dry-run      with --setup: print planned commands only
 ```
 
-`<path>` can be a file or a directory (globbed as `**/*.{ts,tsx}`, excluding node_modules).
+`<path>` can be a file or a directory (globbed as `**/*.{ts,tsx}`, excluding node_modules). The shadcn styles (`vega`/`nova`/`maia`/`lyra`/`mira`) are described at [ui.shadcn.com/create](https://ui.shadcn.com/create); the setup passes `--preset {base}-{style}` (e.g. `radix-vega`) to `shadcn init`.
 
 ## Programmatic API
 
@@ -107,10 +123,10 @@ Radix or Base UI: the generated JSX uses the public shadcn API (`@/components/ui
 
 ## Finish with an LLM
 
-The codemod does the mechanical part; the rest needs judgement. Run with `--md` and it writes a single **`MIGRATION.md`** — a focused handoff you can give to the LLM of your choice (Claude, ChatGPT, Cursor, …):
+The codemod does the mechanical part; the rest needs judgement. `--setup` and the wizard write a **`MIGRATION.md`** automatically when any manual work remains (opt out with `--skip-md`); on the plain codemod run, add `--md` to produce it. It's a focused handoff you can give to the LLM of your choice (Claude, ChatGPT, Cursor, …):
 
 ```bash
-npx mui-to-shadcn src --write --md
+npx mui-to-shadcn src --write --md     # or just `npx mui-to-shadcn` → the wizard does it for you
 ```
 
 `MIGRATION.md` holds exactly what an assistant needs, and no more:
@@ -128,7 +144,7 @@ Only files with remaining work appear, so the report stays small even on large c
 
 ## Compatibility
 
-Targets shadcn CLI v4 (`shadcn init`/`add`, `--base radix|base`) and Tailwind CSS v4 (v4 shadow scale, container widths). Icons require [lucide-react](https://lucide.dev) (shadcn installs it). Output is valid TSX; run Prettier/ESLint afterwards (done automatically by `--setup`).
+Targets shadcn CLI v4 (`shadcn init`/`add`; `--base` and `--style` map to the `{base}-{style}` preset, e.g. `radix-vega`) and Tailwind CSS v4 (v4 shadow scale, container widths). Icons require [lucide-react](https://lucide.dev) (shadcn installs it). Output is valid TSX; run Prettier/ESLint afterwards (done automatically by `--setup`).
 
 ## Contributing
 
