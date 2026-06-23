@@ -80,7 +80,7 @@ mui-to-shadcn [path...] [options]
 --dry-run      with --setup: print planned commands only
 ```
 
-`<path>` can be a file or a directory (globbed as `**/*.{ts,tsx}`, excluding node_modules). The shadcn styles (`vega`/`nova`/`maia`/`lyra`/`mira`) are described at [ui.shadcn.com/create](https://ui.shadcn.com/create); the setup passes `--preset {base}-{style}` (e.g. `radix-vega`) to `shadcn init`.
+`<path>` can be a file or a directory (globbed as `**/*.{ts,tsx}`, excluding node_modules). The shadcn styles (`vega`/`nova`/`maia`/`lyra`/`mira`) are described at [ui.shadcn.com/create](https://ui.shadcn.com/create); the setup passes `--base radix|base` and `--preset <style>` (e.g. `--base radix --preset nova`) to `shadcn init`.
 
 ## Programmatic API
 
@@ -144,7 +144,7 @@ Only files with remaining work appear, so the report stays small even on large c
 
 ## Compatibility
 
-Targets shadcn CLI v4 (`shadcn init`/`add`; `--base` and `--style` map to the `{base}-{style}` preset, e.g. `radix-vega`) and Tailwind CSS v4 (v4 shadow scale, container widths). Icons require [lucide-react](https://lucide.dev) (shadcn installs it). Output is valid TSX; run Prettier/ESLint afterwards (done automatically by `--setup`).
+Targets shadcn CLI v4 (`shadcn init`/`add`; `--base radix|base` and `--style`/`--preset` for the visual style, e.g. `--base radix --preset nova`) and Tailwind CSS v4 (v4 shadow scale, container widths). Icons require [lucide-react](https://lucide.dev) (shadcn installs it). Output is valid TSX; run Prettier/ESLint afterwards (done automatically by `--setup`).
 
 ## Contributing
 

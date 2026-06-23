@@ -1,6 +1,6 @@
 {
   "name": "mui-to-shadcn",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "A ts-morph codemod that converts Material UI (MUI) React code to shadcn/ui, including sx and system props to Tailwind. Optional one-command setup installs the needed shadcn components.",
   "keywords": [
     "mui",

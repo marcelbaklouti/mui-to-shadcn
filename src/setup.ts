@@ -15,7 +15,7 @@ export type PackageManager = "pnpm" | "npm" | "yarn" | "bun";
 export interface SetupOptions {
   target: string[];
   base: "radix" | "base";
-  /** shadcn style: vega | nova | maia | lyra | mira. Combined with base into the preset. */
+  /** shadcn style: vega | nova | maia | lyra | mira (passed as --preset to shadcn init). */
   style: string;
   /** Raw preset name or code; overrides base+style when set (e.g. a ui.shadcn.com code). */
   preset?: string;
@@ -150,12 +150,11 @@ export function planSetup(options: SetupOptions): SetupPlanResult {
 
   const componentList = [...components].sort();
   const needsInit = !hasComponentsJson(cwd);
-  // shadcn selects the Base UI / Radix primitives and the visual style via the preset
-  // (e.g. radix-vega), not a --base flag — which the CLI does not accept and which leaves
-  // init prompting for a preset. A raw preset override (a ui.shadcn.com code) wins.
-  const preset = options.preset ?? `${options.base}-${options.style}`;
+  // shadcn CLI v4: style is --preset (nova, vega, …); primitives are --base (radix | base).
+  // A raw preset override (a ui.shadcn.com code) wins over --style.
+  const preset = options.preset ?? options.style;
   const initCommand = needsInit
-    ? [...runner.dlx, "shadcn@latest", "init", "--preset", preset, "--yes"]
+    ? [...runner.dlx, "shadcn@latest", "init", "--base", options.base, "--preset", preset, "--yes"]
     : null;
   const addCommand = componentList.length
     ? [...runner.dlx, "shadcn@latest", "add", ...componentList, "--yes"]

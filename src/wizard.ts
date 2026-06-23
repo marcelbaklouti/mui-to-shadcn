@@ -23,7 +23,7 @@ import type { SetupOptions, SetupPlan } from "./setup.js";
 const DOCS_BASE = "https://ui.shadcn.com/docs/components-json#base";
 const DOCS_STYLES = "https://ui.shadcn.com/create";
 
-// The five official shadcn styles. The preset is `${base}-${style}` (e.g. radix-vega).
+// The official shadcn styles (--preset); primitives are chosen separately via --base.
 const STYLE_OPTIONS = [
   { value: "vega", label: "Vega", hint: "classic shadcn look, balanced spacing (default)" },
   { value: "nova", label: "Nova", hint: "tighter padding — dashboards & admin panels" },
@@ -107,7 +107,7 @@ export async function runWizard(cwd: string): Promise<number> {
   if (style === "__custom__") {
     const code = await text({
       message: "Paste a preset name or code",
-      placeholder: "e.g. radix-vega or a ui.shadcn.com code like a2r6bw",
+      placeholder: "e.g. nova or a ui.shadcn.com code like a2r6bw",
       validate: (value) => (value?.trim() ? undefined : "Enter a preset name or code"),
     });
     if (isCancel(code)) return cancelled();
@@ -183,7 +183,7 @@ function buildReview(plan: SetupPlan, options: SetupOptions, mode: Mode): string
   lines.push(
     options.preset
       ? `Preset            ${plan.preset}  (custom)`
-      : `Style → preset    ${options.style}  →  ${plan.preset}`,
+      : `Style             ${options.style}  (--preset ${plan.preset}, --base ${options.base})`,
   );
   lines.push(`Package manager   ${manager}`);
   lines.push(`Files to change   ${plan.changedCount} of ${plan.fileCount}`);

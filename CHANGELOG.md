@@ -4,6 +4,14 @@ All notable changes to this project are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-23
+
+Fixes `shadcn init` failing with `Invalid preset: radix-nova` / `base-nova`. shadcn CLI v4 expects the style as `--preset` (e.g. `nova`) and the primitive library as a separate `--base radix|base` flag, not a combined `{base}-{style}` name.
+
+### Fixed
+
+- **`shadcn init` preset and base flags.** Setup and the wizard now run `shadcn init --base radix|base --preset <style>` (e.g. `--base radix --preset nova`) instead of `--preset radix-nova`, which the CLI rejects. Custom `--preset` codes from ui.shadcn.com are still passed verbatim; `--base` is always included so Radix vs. Base UI is applied correctly.
+
 ## [0.4.0] - 2026-06-23
 
 Makes `--setup` actually finish on a real MUI project. Previously `shadcn init` aborted on its Tailwind preflight (an MUI/Emotion app has no Tailwind), and the init command used a flag the CLI does not accept.

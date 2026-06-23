@@ -55,7 +55,7 @@ function baseOptions(dir: string, overrides: Partial<SetupOptions> = {}): SetupO
 const AUTOCOMPLETE_TSX =
   'import { Autocomplete } from "@mui/material";\nexport const A = () => <Autocomplete options={[]} renderInput={() => null} />;\n';
 
-test("planSetup builds the preset from base + style (radix-vega)", () => {
+test("planSetup passes style as preset and base separately to shadcn init", () => {
   inProject(
     { "package.json": NEXT_PKG, "package-lock.json": "", "src/A.tsx": BUTTON_TSX, "src/app/globals.css": "body{}" },
     (dir) => {
@@ -63,8 +63,18 @@ test("planSetup builds the preset from base + style (radix-vega)", () => {
       assert.equal(result.ok, true);
       if (!result.ok) return;
       const plan = result.plan;
-      assert.equal(plan.preset, "radix-vega");
-      assert.deepEqual(plan.initCommand, ["npx", "-y", "shadcn@latest", "init", "--preset", "radix-vega", "--yes"]);
+      assert.equal(plan.preset, "vega");
+      assert.deepEqual(plan.initCommand, [
+        "npx",
+        "-y",
+        "shadcn@latest",
+        "init",
+        "--base",
+        "radix",
+        "--preset",
+        "vega",
+        "--yes",
+      ]);
       assert.ok(plan.componentList.includes("button"));
       assert.equal(plan.manager, "npm");
       assert.equal(plan.tailwind.needed, true);
@@ -73,23 +83,43 @@ test("planSetup builds the preset from base + style (radix-vega)", () => {
   );
 });
 
-test("planSetup honors base + style (base-mira)", () => {
+test("planSetup passes --base base with style preset (mira)", () => {
   inProject({ "package.json": NEXT_PKG, "src/A.tsx": BUTTON_TSX }, (dir) => {
     const result = planSetup(baseOptions(dir, { base: "base", style: "mira" }));
     assert.equal(result.ok, true);
     if (!result.ok) return;
-    assert.equal(result.plan.preset, "base-mira");
-    assert.ok(result.plan.initCommand?.includes("base-mira"));
+    assert.equal(result.plan.preset, "mira");
+    assert.deepEqual(result.plan.initCommand, [
+      "pnpm",
+      "dlx",
+      "shadcn@latest",
+      "init",
+      "--base",
+      "base",
+      "--preset",
+      "mira",
+      "--yes",
+    ]);
   });
 });
 
-test("planSetup lets a raw preset override base + style", () => {
+test("planSetup lets a raw preset override style but still passes --base", () => {
   inProject({ "package.json": NEXT_PKG, "src/A.tsx": BUTTON_TSX }, (dir) => {
     const result = planSetup(baseOptions(dir, { base: "radix", style: "vega", preset: "a2r6bw" }));
     assert.equal(result.ok, true);
     if (!result.ok) return;
     assert.equal(result.plan.preset, "a2r6bw");
-    assert.ok(result.plan.initCommand?.includes("a2r6bw"));
+    assert.deepEqual(result.plan.initCommand, [
+      "pnpm",
+      "dlx",
+      "shadcn@latest",
+      "init",
+      "--base",
+      "radix",
+      "--preset",
+      "a2r6bw",
+      "--yes",
+    ]);
   });
 });
 

@@ -37,7 +37,7 @@ npm run migrate -- <pfad> --setup [--base radix|base] [--style vega|nova|maia|ly
 
 1. ermittelt in einem Probelauf alle benötigten shadcn-Komponenten
 2. richtet Tailwind CSS v4 ein, falls es fehlt — installiert `tailwindcss`/`@tailwindcss/postcss`, ergänzt `@import "tailwindcss"` im globalen Stylesheet und legt `postcss.config.mjs` an (mit `--skip-tailwind` überspringbar)
-3. `shadcn init --preset {radix|base}-{vega|nova|maia|lyra|mira}` (nur wenn keine components.json existiert)
+3. `shadcn init --base radix|base --preset <vega|nova|maia|lyra|mira>` (nur wenn keine components.json existiert)
 4. `shadcn add <alle benötigten Komponenten>`
 5. schreibt die konvertierten Dateien
 6. `prettier --write`
