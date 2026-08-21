@@ -291,8 +291,11 @@ test("Menu becomes DropdownMenu, MenuItem becomes DropdownMenuItem", () => {
   const result = migrate(
     'import { Menu, MenuItem, Divider } from "@mui/material";\nexport const A = () => (\n  <Menu anchorEl={el} open={open} onClose={close}>\n    <MenuItem onClick={close}>Profil</MenuItem>\n    <Divider />\n    <MenuItem onClick={close}>Abmelden</MenuItem>\n  </Menu>\n);\n',
   );
-  assert.match(result.text, /<DropdownMenu open=\{open\} onOpenChange=\{close\}>/);
-  assert.match(result.text, /<DropdownMenuTrigger>Menu<\/DropdownMenuTrigger>/);
+  // anchorEl -> uncontrolled DropdownMenu with a visible TODO trigger (a
+  // controlled root would make the emitted trigger close the menu on click).
+  assert.match(result.text, /<DropdownMenu>/);
+  assert.doesNotMatch(result.text, /open=\{open\}/);
+  assert.match(result.text, /<DropdownMenuTrigger>\{\/\* TODO/);
   assert.match(result.text, /<DropdownMenuContent>/);
   assert.match(result.text, /<DropdownMenuItem onClick=\{close\}>Profil<\/DropdownMenuItem>/);
   assert.match(result.text, /<DropdownMenuSeparator \/>/);
@@ -303,10 +306,11 @@ test("Popover becomes Popover with Trigger and Content", () => {
   const result = migrate(
     'import { Popover } from "@mui/material";\nexport const A = () => (\n  <Popover open={open} anchorEl={el} onClose={close}>Inhalt</Popover>\n);\n',
   );
-  assert.match(result.text, /<Popover open=\{open\} onOpenChange=\{close\}>/);
-  assert.match(result.text, /<PopoverTrigger>Open<\/PopoverTrigger>/);
+  // anchorEl -> uncontrolled Popover with a visible TODO trigger.
+  assert.match(result.text, /<Popover>/);
+  assert.match(result.text, /<PopoverTrigger>\{\/\* TODO/);
   assert.match(result.text, /<PopoverContent>/);
-  assert.doesNotMatch(result.text, /anchorEl/);
+  assert.doesNotMatch(result.text, /anchorEl=/);
 });
 
 test("Modal becomes Dialog with DialogContent", () => {

@@ -646,38 +646,50 @@ export function menuContainer(context: ContainerContext): ContainerEdit[] {
     ],
     moduleSpecifier: "@/components/ui/dropdown-menu",
   });
-  if (attribute(element, "anchorEl")) {
-    context.warn("Menu anchorEl dropped; replace the DropdownMenuTrigger with your trigger element");
-  }
-  if (attribute(element, "onClose")) {
+  // The MUI anchorEl pattern (open={Boolean(anchorEl)} onClose={setAnchorEl(null)})
+  // does not translate to Radix's trigger-composed model. Keeping open/onClose
+  // would make the emitted trigger close the menu on click. Emit an UNCONTROLLED
+  // DropdownMenu with a visible TODO trigger instead, so the break is obvious.
+  const anchored = Boolean(attribute(element, "anchorEl"));
+  const drop = new Set([
+    "anchorEl",
+    "anchorOrigin",
+    "transformOrigin",
+    "keepMounted",
+    "TransitionComponent",
+    "transitionDuration",
+    "variant",
+    "id",
+    "MenuListProps",
+    "PaperProps",
+    "slotProps",
+    "elevation",
+    "getContentAnchorEl",
+    "autoFocus",
+    "disableAutoFocusItem",
+    "marginThreshold",
+    ...ROOT_STYLE_DROP,
+  ]);
+  if (anchored) {
+    drop.add("open");
+    drop.add("onClose");
+    context.warn(
+      "Menu used anchorEl: emitted an uncontrolled DropdownMenu — move your trigger button into DropdownMenuTrigger and delete the anchorEl/open state",
+    );
+  } else if (attribute(element, "onClose")) {
     context.warn("Menu onClose -> onOpenChange; the handler now receives a boolean");
   }
 
   const rootAttributes = renderRootAttributes(element, {
     context,
-    rename: new Map([["onClose", "onOpenChange"]]),
-    drop: new Set([
-      "anchorEl",
-      "anchorOrigin",
-      "transformOrigin",
-      "keepMounted",
-      "TransitionComponent",
-      "transitionDuration",
-      "variant",
-      "id",
-      "MenuListProps",
-      "PaperProps",
-      "slotProps",
-      "elevation",
-      "getContentAnchorEl",
-      "autoFocus",
-      "disableAutoFocusItem",
-      "marginThreshold",
-      ...ROOT_STYLE_DROP,
-    ]),
+    rename: anchored ? undefined : new Map([["onClose", "onOpenChange"]]),
+    drop,
   });
 
-  const innerOpen = `\n${indent}  <DropdownMenuTrigger>Menu</DropdownMenuTrigger>\n${indent}  <DropdownMenuContent${contentStyleAttributes(element)}>`;
+  const trigger = anchored
+    ? `<DropdownMenuTrigger>{/* TODO(mui-to-shadcn): move your trigger element here (was anchorEl) */}</DropdownMenuTrigger>`
+    : `<DropdownMenuTrigger>Menu</DropdownMenuTrigger>`;
+  const innerOpen = `\n${indent}  ${trigger}\n${indent}  <DropdownMenuContent${contentStyleAttributes(element)}>`;
   const innerClose = `${indent}  </DropdownMenuContent>\n${indent}`;
   const edits = emitWrap(context, `<DropdownMenu${rootAttributes}>`, innerOpen, innerClose, "</DropdownMenu>");
 
@@ -702,36 +714,46 @@ export function popoverContainer(context: ContainerContext): ContainerEdit[] {
     names: ["Popover", "PopoverContent", "PopoverTrigger"],
     moduleSpecifier: "@/components/ui/popover",
   });
-  if (attribute(element, "anchorEl")) {
-    context.warn("Popover anchorEl dropped; replace the PopoverTrigger with your trigger element");
-  }
-  if (attribute(element, "onClose")) {
+  // See menuContainer: the anchorEl pattern would make the emitted trigger close
+  // the popover, so emit an uncontrolled Popover with a visible TODO trigger.
+  const anchored = Boolean(attribute(element, "anchorEl"));
+  const drop = new Set([
+    "anchorEl",
+    "anchorOrigin",
+    "transformOrigin",
+    "elevation",
+    "PaperProps",
+    "slotProps",
+    "marginThreshold",
+    "keepMounted",
+    "disableRestoreFocus",
+    "container",
+    "id",
+    "TransitionComponent",
+    "transitionDuration",
+    ...ROOT_STYLE_DROP,
+  ]);
+  if (anchored) {
+    drop.add("open");
+    drop.add("onClose");
+    context.warn(
+      "Popover used anchorEl: emitted an uncontrolled Popover — move your trigger element into PopoverTrigger and delete the anchorEl/open state",
+    );
+  } else if (attribute(element, "onClose")) {
     context.warn("Popover onClose -> onOpenChange; the handler now receives a boolean");
   }
 
   const rootAttributes = renderRootAttributes(element, {
     context,
-    rename: new Map([["onClose", "onOpenChange"]]),
-    drop: new Set([
-      "anchorEl",
-      "anchorOrigin",
-      "transformOrigin",
-      "elevation",
-      "PaperProps",
-      "slotProps",
-      "marginThreshold",
-      "keepMounted",
-      "disableRestoreFocus",
-      "container",
-      "id",
-      "TransitionComponent",
-      "transitionDuration",
-      ...ROOT_STYLE_DROP,
-    ]),
+    rename: anchored ? undefined : new Map([["onClose", "onOpenChange"]]),
+    drop,
   });
 
   const { indent } = context;
-  const innerOpen = `\n${indent}  <PopoverTrigger>Open</PopoverTrigger>\n${indent}  <PopoverContent${contentStyleAttributes(element)}>`;
+  const trigger = anchored
+    ? `<PopoverTrigger>{/* TODO(mui-to-shadcn): move your trigger element here (was anchorEl) */}</PopoverTrigger>`
+    : `<PopoverTrigger>Open</PopoverTrigger>`;
+  const innerOpen = `\n${indent}  ${trigger}\n${indent}  <PopoverContent${contentStyleAttributes(element)}>`;
   const innerClose = `${indent}  </PopoverContent>\n${indent}`;
   return emitWrap(context, `<Popover${rootAttributes}>`, innerOpen, innerClose, "</Popover>");
 }
