@@ -11,6 +11,7 @@ import {
 } from "./composites.js";
 import {
   accordionContainer,
+  backdropContainer,
   badgeContainer,
   breadcrumbsContainer,
   circularProgressTransform,
@@ -481,14 +482,7 @@ export function buildRegistry(): Registry {
   };
   registry.ImageListItem = { target: "div", props: { cols: { drop: true }, rows: { drop: true } } };
 
-  registry.Backdrop = {
-    target: "div",
-    defaultClassName: "fixed inset-0 z-50 bg-black/50",
-    props: {
-      open: { drop: true, warning: "Backdrop open dropped; control visibility with a condition" },
-      invisible: { drop: true },
-    },
-  };
+  registry.Backdrop = { containerTransform: backdropContainer };
 
   registry.List = {
     target: "ul",

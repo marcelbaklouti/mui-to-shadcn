@@ -92,6 +92,67 @@ test("spread props are preserved on Select (react-hook-form field)", () => {
   assert.match(result.text, /<Select \{\.\.\.field\}>/);
 });
 
+// ---- unconditional-render gating ----
+
+test("Backdrop is gated on its open expression, not rendered unconditionally", () => {
+  const result = migrate(
+    'import { Backdrop, CircularProgress } from "@mui/material";\n' +
+      "export const A = ({ loading }: any) => (<Backdrop open={loading}><CircularProgress /></Backdrop>);\n",
+  );
+  assert.match(result.text, /\{loading && \(<div className="[^"]*bg-black\/50"/);
+  assert.match(result.text, /<\/div>\)\}/);
+});
+
+test("Backdrop preserves onClick (click-to-close)", () => {
+  const result = migrate(
+    'import { Backdrop } from "@mui/material";\n' +
+      "export const A = ({ open, close }: any) => (<Backdrop open={open} onClick={close}>x</Backdrop>);\n",
+  );
+  assert.match(result.text, /onClick=\{close\}/);
+});
+
+test("Snackbar child is gated on open", () => {
+  const result = migrate(
+    'import { Snackbar, Alert } from "@mui/material";\n' +
+      "export const A = ({ open }: any) => (<Snackbar open={open}><Alert>Saved</Alert></Snackbar>);\n",
+  );
+  assert.match(result.text, /\{open && \(/);
+});
+
+test("Fade/transition child is gated on the in condition", () => {
+  const result = migrate(
+    'import { Fade } from "@mui/material";\n' +
+      "export const A = ({ show }: any) => (<Fade in={show}><div>c</div></Fade>);\n",
+  );
+  assert.match(result.text, /\{show && \(<div>c<\/div>\)\}/);
+});
+
+test("permanent Drawer becomes a static aside (not a closed Sheet)", () => {
+  const result = migrate(
+    'import { Drawer } from "@mui/material";\n' +
+      'export const A = () => (<Drawer variant="permanent" anchor="left"><nav>Nav</nav></Drawer>);\n',
+  );
+  assert.match(result.text, /<aside className="[^"]*border-r[^"]*"><nav>Nav<\/nav><\/aside>/);
+  assert.doesNotMatch(result.text, /Sheet/);
+});
+
+test("persistent Drawer becomes an aside gated on open", () => {
+  const result = migrate(
+    'import { Drawer } from "@mui/material";\n' +
+      'export const A = ({ open }: any) => (<Drawer variant="persistent" open={open}><nav>P</nav></Drawer>);\n',
+  );
+  assert.match(result.text, /\{open && \(<aside/);
+});
+
+test("temporary Drawer still becomes a Sheet", () => {
+  const result = migrate(
+    'import { Drawer } from "@mui/material";\n' +
+      "export const A = ({ open }: any) => (<Drawer open={open}><nav>T</nav></Drawer>);\n",
+  );
+  assert.match(result.text, /<Sheet/);
+  assert.match(result.text, /<SheetContent side="left">/);
+});
+
 // ---- reference-safe import removal ----
 
 test("a component used in styled() is left as MUI, not half-converted into a dangling reference", () => {
