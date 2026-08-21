@@ -68,3 +68,20 @@ test("buildThemeCss emits a :root override block", () => {
   assert.match(css, /--primary: #1976d2;/);
   assert.match(css, /--radius: 12px;/);
 });
+
+test("theme.components defaultProps/styleOverrides are detected", () => {
+  const tokens = scan(
+    'import { createTheme } from "@mui/material/styles";\n' +
+      "export const theme = createTheme({\n" +
+      "  components: {\n" +
+      '    MuiTextField: { defaultProps: { size: "small", variant: "outlined" } },\n' +
+      "    MuiButton: { styleOverrides: { root: { borderRadius: 12 } } },\n" +
+      "  },\n" +
+      "});\n",
+  );
+  assert.ok(tokens);
+  const textField = tokens.components.find((c) => c.component === "MuiTextField");
+  assert.deepEqual(textField?.defaultProps, ["size", "variant"]);
+  const button = tokens.components.find((c) => c.component === "MuiButton");
+  assert.equal(button?.hasStyleOverrides, true);
+});

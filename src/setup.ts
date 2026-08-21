@@ -192,31 +192,43 @@ export function planSetup(options: SetupOptions): SetupPlanResult {
     steps.push(`write MIGRATION.md (${mdTasks} task${mdTasks === 1 ? "" : "s"} + ${mdReviews} review note${mdReviews === 1 ? "" : "s"} for an LLM)`);
   }
 
-  // Extract brand tokens from a createTheme() palette and emit them as a :root
-  // override, appended to the global CSS after shadcn init writes its defaults.
+  // Extract brand tokens and global overrides from a createTheme() call. The
+  // palette becomes a :root override appended to the CSS (after shadcn's
+  // defaults); component defaultProps/styleOverrides and mode/spacing are
+  // surfaced as notes.
   let themeCss: string | null = null;
   let themeCssPath: string | null = null;
-  if (tailwind.css) {
-    for (const file of files) {
-      const tokens = scanThemeTokens(file);
-      if (!tokens) continue;
-      const css = buildThemeCss(tokens);
-      if (css) {
-        themeCss = css;
-        themeCssPath = tailwind.css.path;
-        const count = Object.keys(tokens.colors).length + (tokens.radius ? 1 : 0);
-        steps.push(`append ${count} brand token(s) from createTheme() to ${tailwind.css.path}`);
-        if (tokens.mode === "dark") {
-          steps.push('theme palette.mode is "dark" — add class="dark" to <html> for shadcn dark mode');
-        }
-        if (tokens.spacing && tokens.spacing !== 8) {
-          steps.push(
-            `WARNING: createTheme spacing=${tokens.spacing} (not MUI's default 8) — converted spacing classes assume 8px and will be off by a factor; review them`,
-          );
-        }
-      }
-      break;
+  for (const file of files) {
+    const tokens = scanThemeTokens(file);
+    if (!tokens) continue;
+    const css = buildThemeCss(tokens);
+    if (css && tailwind.css) {
+      themeCss = css;
+      themeCssPath = tailwind.css.path;
+      const count = Object.keys(tokens.colors).length + (tokens.radius ? 1 : 0);
+      steps.push(`append ${count} brand token(s) from createTheme() to ${tailwind.css.path}`);
+    } else if (css) {
+      steps.push("createTheme palette found — add the brand tokens to your CSS :root (see MIGRATION.md)");
     }
+    if (tokens.mode === "dark") {
+      steps.push('theme palette.mode is "dark" — add class="dark" to <html> for shadcn dark mode');
+    }
+    if (tokens.spacing && tokens.spacing !== 8) {
+      steps.push(
+        `WARNING: createTheme spacing=${tokens.spacing} (not MUI's default 8) — converted spacing classes assume 8px and will be off by a factor; review them`,
+      );
+    }
+    for (const override of tokens.components) {
+      const parts: string[] = [];
+      if (override.defaultProps.length) parts.push(`defaultProps {${override.defaultProps.join(", ")}}`);
+      if (override.hasStyleOverrides) parts.push("styleOverrides");
+      if (override.hasVariants) parts.push("variants");
+      const tag = override.component.replace(/^Mui/, "");
+      steps.push(
+        `theme.components.${override.component} (${parts.join(", ")}) not applied — this changed every <${tag}>; set it per-instance or in your shadcn component`,
+      );
+    }
+    break;
   }
 
   return {
