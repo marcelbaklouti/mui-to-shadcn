@@ -92,6 +92,55 @@ test("spread props are preserved on Select (react-hook-form field)", () => {
   assert.match(result.text, /<Select \{\.\.\.field\}>/);
 });
 
+// ---- reference-safe import removal ----
+
+test("a component used in styled() is left as MUI, not half-converted into a dangling reference", () => {
+  const result = migrate(
+    'import { Button } from "@mui/material";\n' +
+      'import { styled } from "@mui/material/styles";\n' +
+      "const Fancy = styled(Button)({ padding: 8 });\n" +
+      'export const A = () => (<><Button variant="contained">x</Button><Fancy>y</Fancy></>);\n',
+  );
+  // Button import is kept (styled(Button) still resolves) and not removed.
+  assert.match(result.text, /import \{ Button \} from "@mui\/material"/);
+  assert.match(result.text, /styled\(Button\)/);
+  assert.ok(result.residualMui.includes("@mui/material"));
+  assert.ok(result.manual.some((m) => m.component === "Button"));
+});
+
+test("a component used in a value map is left as MUI (no undefined identifier)", () => {
+  const result = migrate(
+    'import { CircularProgress } from "@mui/material";\n' +
+      "const map = { spinner: CircularProgress };\n" +
+      "export const A = () => <CircularProgress />;\n",
+  );
+  assert.match(result.text, /import \{ CircularProgress \} from "@mui\/material"/);
+  assert.match(result.text, /spinner: CircularProgress/);
+  assert.doesNotMatch(result.text, /Loader2/);
+});
+
+test("a value reference on one component does not block converting others", () => {
+  const result = migrate(
+    'import { Button, TextField } from "@mui/material";\n' +
+      'import { styled } from "@mui/material/styles";\n' +
+      "const Fancy = styled(Button)({});\n" +
+      'export const A = () => (<><Fancy>x</Fancy><TextField label="Name" /></>);\n',
+  );
+  assert.match(result.text, /from "@\/components\/ui\/input"/);
+  assert.match(result.text, /import \{ Button \} from "@mui\/material"/);
+});
+
+test("a wrapper file whose shadcn name collides with a local declaration is left as MUI", () => {
+  const result = migrate(
+    'import { Button as MuiButton } from "@mui/material";\n' +
+      "export function Button(props: any) {\n  return <MuiButton {...props} />;\n}\n",
+  );
+  // No duplicate `Button` import and no self-recursive wrapper.
+  assert.doesNotMatch(result.text, /from "@\/components\/ui\/button"/);
+  assert.match(result.text, /import \{ Button as MuiButton \} from "@mui\/material"/);
+  assert.ok(result.manual.some((m) => m.component === "Button"));
+});
+
 // ---- end-of-run "still references MUI" safety net ----
 
 test("a fully converted file reports no residual MUI", () => {

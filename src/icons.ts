@@ -10,6 +10,7 @@ import type { Edit } from "./edits.js";
 import { applyEdits, resolveOverlaps } from "./edits.js";
 import { insertImportBlock } from "./imports.js";
 import { lucideForMuiIcon } from "./icon-map.js";
+import { hasNonTagReference } from "./nodes.js";
 
 // v5 (@mui/icons-material) and v4 (@material-ui/icons) share the same icon names.
 const ICON_BARRELS = ["@mui/icons-material", "@material-ui/icons"];
@@ -102,24 +103,6 @@ function collectIconBindings(sourceFile: SourceFile): IconBinding[] {
 }
 
 // True if the local name is referenced anywhere other than as a JSX tag or in an import.
-function hasNonTagReference(sourceFile: SourceFile, localName: string): boolean {
-  for (const id of sourceFile.getDescendantsOfKind(SyntaxKind.Identifier)) {
-    if (id.getText() !== localName) continue;
-    if (id.getFirstAncestorByKind(SyntaxKind.ImportDeclaration)) continue;
-    const parent = id.getParent();
-    const kind = parent?.getKind();
-    if (
-      kind === SyntaxKind.JsxOpeningElement ||
-      kind === SyntaxKind.JsxSelfClosingElement ||
-      kind === SyntaxKind.JsxClosingElement
-    ) {
-      continue;
-    }
-    return true;
-  }
-  return false;
-}
-
 function stringValueOf(attribute: JsxAttribute): string | undefined {
   const initializer = attribute.getInitializer();
   if (!initializer) return undefined;

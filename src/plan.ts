@@ -16,7 +16,7 @@ import type { Edit } from "./edits.js";
 import { getOpeningElement, parseElement } from "./attributes.js";
 import { renderAttribute } from "./render.js";
 import { collectMuiBindings } from "./imports.js";
-import { descendantJsxElements, getTagName, indentOf } from "./nodes.js";
+import { descendantJsxElements, getTagName, hasNonTagReference, indentOf } from "./nodes.js";
 import { INFRA_SKIP } from "./infra.js";
 
 export interface ManualHit {
@@ -173,6 +173,36 @@ export function planFile(
   const localToCanonical = new Map<string, string>();
   for (const binding of bindings) localToCanonical.set(binding.localName, binding.canonicalName);
 
+  // Bindings whose local name is also used as a value (styled(X), component={X},
+  // a { icon: X } map, …). Converting their JSX would strip the import and leave
+  // the value reference dangling (or silently rebind it to the shadcn component),
+  // so they are left as MUI and flagged instead. The residual-MUI safety net in
+  // run.ts then surfaces the file.
+  const valueRefLocals = new Set<string>();
+  for (const binding of bindings) {
+    if (hasNonTagReference(sourceFile, binding.localName)) valueRefLocals.add(binding.localName);
+  }
+  const warnedValueRef = new Set<string>();
+
+  // Top-level names declared in this file. If a converted component's shadcn
+  // target would share a name with one of these (the classic wrapper file:
+  // `import { Button as MuiButton }` + `export function Button`), emitting the
+  // shadcn import collides with the local declaration (and makes the wrapper
+  // recurse into itself). Leave those as MUI and flag them.
+  const localDeclarationNames = new Set<string>();
+  for (const fn of sourceFile.getFunctions()) {
+    const name = fn.getName();
+    if (name) localDeclarationNames.add(name);
+  }
+  for (const cls of sourceFile.getClasses()) {
+    const name = cls.getName();
+    if (name) localDeclarationNames.add(name);
+  }
+  for (const declaration of sourceFile.getVariableDeclarations()) {
+    localDeclarationNames.add(declaration.getName());
+  }
+  const warnedCollision = new Set<string>();
+
   const nodes = collectJsxNodes(sourceFile);
 
   const edits: Edit[] = [];
@@ -199,6 +229,33 @@ export function planFile(
     if (INFRA_SKIP.has(canonical)) continue;
 
     const line = node.getStartLineNumber();
+
+    // Leave components that are also referenced as a value untouched, so we do
+    // not remove an import that a styled()/component=/map still needs.
+    if (valueRefLocals.has(localTag)) {
+      if (!warnedValueRef.has(localTag)) {
+        warnedValueRef.add(localTag);
+        const message = `${localTag} is also used as a value (styled()/component=/map); left as MUI so the reference still resolves — convert it manually`;
+        warnings.push(`line ${line} <${localTag}>: ${message}`);
+        manual.push({ component: canonical, line, message });
+      }
+      continue;
+    }
+
+    // Leave components whose shadcn name would collide with a local declaration
+    // (design-system wrapper files) as MUI, to avoid a duplicate identifier and
+    // a self-recursive wrapper.
+    const targetName = registry[canonical]?.target ?? canonical;
+    if (localDeclarationNames.has(canonical) || localDeclarationNames.has(targetName)) {
+      if (!warnedCollision.has(localTag)) {
+        warnedCollision.add(localTag);
+        const message = `its shadcn name collides with a local declaration in this file (wrapper component); left as MUI — convert it manually, aliasing the shadcn import`;
+        warnings.push(`line ${line} <${localTag}>: ${message}`);
+        manual.push({ component: canonical, line, message });
+      }
+      continue;
+    }
+
     const warn = (message: string) => warnings.push(`line ${line} <${localTag}>: ${message}`);
 
     const mapping = registry[canonical];
