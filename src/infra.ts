@@ -6,6 +6,7 @@ import { applyEdits, resolveOverlaps } from "./edits.js";
 // Provider wrappers: keep the children, drop the wrapper and its props.
 const UNWRAP = new Set([
   "ThemeProvider",
+  "MuiThemeProvider", // v4 alias
   "StyledEngineProvider",
   "CssVarsProvider",
   "Experimental_CssVarsProvider",
@@ -20,6 +21,7 @@ const REMOVE = new Set(["CssBaseline", "GlobalStyles", "Global"]);
 // Theme/styling utilities that cannot be auto-converted (arbitrary CSS / runtime theme).
 const WARN_UTILS = new Set([
   "createTheme",
+  "createMuiTheme", // v4 alias
   "responsiveFontSizes",
   "extendTheme",
   "useTheme",
@@ -48,6 +50,10 @@ const INFRA_SOURCES = new Set([
   "@emotion/styled",
   "@emotion/cache",
   "@mui/styles",
+  // v4 theming/styling packages.
+  "@material-ui/core",
+  "@material-ui/core/styles",
+  "@material-ui/styles",
 ]);
 
 function isInfraSource(specifier: string): boolean {

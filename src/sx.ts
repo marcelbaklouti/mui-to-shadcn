@@ -240,6 +240,18 @@ function readScalar(expression: Expression): ScalarValue | null {
   return null;
 }
 
+// Tailwind arbitrary values may not contain spaces. Strip a trailing !important
+// (not expressible inline per-emitter) and underscore internal whitespace so
+// calc()/min()/clamp()/multi-token values emit a single valid class instead of
+// several garbage ones.
+function arbitrary(raw: string): string {
+  return raw.replace(/\s*!important\s*$/i, "").replace(/\s+/g, "_");
+}
+
+// The sizing keys where MUI treats a unitless number in (0, 1] as a percentage
+// (width/height/min/max) — but NOT the position keys (top/right/bottom/left).
+const FRACTIONAL_SIZING = new Set(["w", "h", "min-w", "max-w", "min-h", "max-h"]);
+
 function spacingClass(prefix: string, value: ScalarValue): string | null {
   if (value.kind === "number") {
     const numeric = Number.parseFloat(value.raw);
@@ -252,7 +264,7 @@ function spacingClass(prefix: string, value: ScalarValue): string | null {
     return `${sign}${prefix}-[${magnitude * 8}px]`;
   }
   if (value.raw === "auto") return `${prefix}-auto`;
-  return `${prefix}-[${value.raw}]`;
+  return `${prefix}-[${arbitrary(value.raw)}]`;
 }
 
 function sizingClass(prefix: string, value: ScalarValue): string | null {
@@ -260,12 +272,18 @@ function sizingClass(prefix: string, value: ScalarValue): string | null {
     const numeric = Number.parseFloat(value.raw);
     if (Number.isNaN(numeric)) return null;
     if (numeric === 0) return `${prefix}-0`;
+    // MUI: width/height numbers in (0, 1] are percentages (1 === 100%).
+    if (FRACTIONAL_SIZING.has(prefix) && numeric > 0 && numeric <= 1) {
+      if (numeric === 1) return `${prefix}-full`;
+      if (numeric === 0.5) return `${prefix}-1/2`;
+      return `${prefix}-[${numeric * 100}%]`;
+    }
     return `${prefix}-[${numeric}px]`;
   }
   if (value.raw === "100%") return `${prefix}-full`;
   if (value.raw === "auto") return `${prefix}-auto`;
   if (value.raw === "100vw") return `${prefix}-screen`;
-  return `${prefix}-[${value.raw}]`;
+  return `${prefix}-[${arbitrary(value.raw)}]`;
 }
 
 function colorClass(prefix: string, value: ScalarValue): string | null {
@@ -273,7 +291,7 @@ function colorClass(prefix: string, value: ScalarValue): string | null {
   const token = colorTokenMap[value.raw];
   if (token) return `${prefix}-${token}`;
   if (value.raw === "white" || value.raw === "black") return `${prefix}-${value.raw}`;
-  return `${prefix}-[${value.raw}]`;
+  return `${prefix}-[${arbitrary(value.raw)}]`;
 }
 
 function radiusClass(value: ScalarValue): string | null {
@@ -283,7 +301,7 @@ function radiusClass(value: ScalarValue): string | null {
     if (numeric === 0) return "rounded-none";
     return `rounded-[${numeric * 4}px]`;
   }
-  return `rounded-[${value.raw}]`;
+  return `rounded-[${arbitrary(value.raw)}]`;
 }
 
 function fontWeightClass(value: ScalarValue): string | null {
@@ -318,7 +336,11 @@ function lookupClass(key: string, value: ScalarValue): string | null {
     case "flexShrink":
       return value.raw === "1" ? "shrink" : value.raw === "0" ? "shrink-0" : null;
     case "flex":
-      return value.kind === "string" ? `flex-[${value.raw}]` : null;
+      if (value.kind === "number") return value.raw === "1" ? "flex-1" : `flex-[${value.raw}]`;
+      if (value.raw === "auto") return "flex-auto";
+      if (value.raw === "none") return "flex-none";
+      if (value.raw === "initial") return "flex-initial";
+      return `flex-[${arbitrary(value.raw)}]`;
     case "position":
       return value.kind === "string" ? (positionMap[value.raw] ?? null) : null;
     case "zIndex":
@@ -361,7 +383,7 @@ function lookupClass(key: string, value: ScalarValue): string | null {
         ? `tracking-[${value.raw}px]`
         : value.raw === "normal"
           ? "tracking-normal"
-          : `tracking-[${value.raw}]`;
+          : `tracking-[${arbitrary(value.raw)}]`;
     case "textTransform":
       return value.kind === "string" ? (textTransformMap[value.raw] ?? null) : null;
     case "fontStyle":
@@ -408,7 +430,7 @@ function lookupClass(key: string, value: ScalarValue): string | null {
           ? "basis-auto"
           : value.raw === "100%"
             ? "basis-full"
-            : `basis-[${value.raw}]`;
+            : `basis-[${arbitrary(value.raw)}]`;
     case "verticalAlign":
       return value.kind === "string" ? (verticalAlignMap[value.raw] ?? `align-[${value.raw}]`) : null;
     case "gridColumn":
@@ -542,6 +564,41 @@ function readScalarFrom(attribute: JsxAttribute): ScalarValue | null {
   return expression ? readScalar(expression) : null;
 }
 
+// Parse a responsive breakpoint object on a layout prop, e.g.
+// direction={{ xs: "column", sm: "row" }} or spacing={{ xs: 1, md: 4 }}.
+function readBreakpointEntries(attribute: JsxAttribute): { bp: string; scalar: ScalarValue }[] | null {
+  const expression = attributeExpression(attribute);
+  if (!expression || !Node.isObjectLiteralExpression(expression)) return null;
+  const entries: { bp: string; scalar: ScalarValue }[] = [];
+  for (const property of expression.getProperties()) {
+    if (!Node.isPropertyAssignment(property)) return null;
+    const initializer = property.getInitializer();
+    const scalar = initializer ? readScalar(initializer) : null;
+    if (!scalar) return null;
+    entries.push({ bp: property.getName(), scalar });
+  }
+  return entries;
+}
+
+// Turn a responsive breakpoint object into breakpoint-prefixed classes, or null
+// if any breakpoint is unknown or any value is unmappable (so the caller can warn
+// instead of silently dropping the responsive prop).
+function responsiveClasses(
+  attribute: JsxAttribute,
+  toClass: (scalar: ScalarValue) => string | null,
+): string[] | null {
+  const entries = readBreakpointEntries(attribute);
+  if (!entries) return null;
+  const out: string[] = [];
+  for (const { bp, scalar } of entries) {
+    const prefix = breakpointPrefix[bp];
+    const cls = toClass(scalar);
+    if (prefix === undefined || !cls) return null;
+    out.push(`${prefix}${cls}`);
+  }
+  return out;
+}
+
 // Parse a Grid `size`/`offset` breakpoint object literal, e.g. { xs: 12, md: 6 }.
 function gridLineList(expression: Expression | undefined): { bp: string; kind: "number" | "string"; raw: string }[] {
   if (!expression || !Node.isObjectLiteralExpression(expression)) return [];
@@ -589,12 +646,23 @@ function collectLayoutProps(
     if (tag === "Stack" && name === "direction") {
       consumed.add(name);
       const scalar = readScalarFrom(attribute);
-      if (scalar && scalar.kind === "string") {
-        const mapped = flexDirectionMap[scalar.raw];
+      const directionClass = (value: ScalarValue): string | null =>
+        value.kind === "string" ? (flexDirectionMap[value.raw] ?? null) : null;
+      if (scalar) {
+        const mapped = directionClass(scalar);
         if (mapped) {
           const index = classes.indexOf("flex-col");
           if (index >= 0) classes.splice(index, 1);
           classes.push(mapped);
+        }
+      } else {
+        const responsive = responsiveClasses(attribute, directionClass);
+        if (responsive) {
+          const index = classes.indexOf("flex-col");
+          if (index >= 0) classes.splice(index, 1);
+          classes.push(...responsive);
+        } else {
+          warnings.push("Stack direction responsive value could not be mapped; set the flex direction manually");
         }
       }
       continue;
@@ -602,8 +670,14 @@ function collectLayoutProps(
     if (tag === "Stack" && name === "spacing") {
       consumed.add(name);
       const scalar = readScalarFrom(attribute);
-      const cls = scalar ? stackSpacingClass(scalar) : null;
-      if (cls) classes.push(cls);
+      if (scalar) {
+        const cls = stackSpacingClass(scalar);
+        if (cls) classes.push(cls);
+      } else {
+        const responsive = responsiveClasses(attribute, stackSpacingClass);
+        if (responsive) classes.push(...responsive);
+        else warnings.push("Stack spacing responsive value could not be mapped; set the gap manually");
+      }
       continue;
     }
 
@@ -621,18 +695,35 @@ function collectLayoutProps(
       if (name === "columns") {
         consumed.add(name);
         const scalar = readScalarFrom(attribute);
-        if (scalar && scalar.kind === "number") {
-          classes.push(`grid-cols-${scalar.raw}`);
-          hasColumns = true;
+        const columnsClass = (value: ScalarValue): string | null =>
+          value.kind === "number" ? `grid-cols-${value.raw}` : null;
+        if (scalar) {
+          const cls = columnsClass(scalar);
+          if (cls) {
+            classes.push(cls);
+            hasColumns = true;
+          }
+        } else {
+          const responsive = responsiveClasses(attribute, columnsClass);
+          if (responsive) {
+            classes.push(...responsive);
+            hasColumns = true;
+          }
         }
         continue;
       }
       if (name === "spacing" || name === "rowSpacing" || name === "columnSpacing") {
         consumed.add(name);
-        const scalar = readScalarFrom(attribute);
         const axis = name === "rowSpacing" ? "gap-y" : name === "columnSpacing" ? "gap-x" : "gap";
-        const cls = scalar ? spacingClass(axis, scalar) : null;
-        if (cls) classes.push(cls);
+        const scalar = readScalarFrom(attribute);
+        if (scalar) {
+          const cls = spacingClass(axis, scalar);
+          if (cls) classes.push(cls);
+        } else {
+          const responsive = responsiveClasses(attribute, (value) => spacingClass(axis, value));
+          if (responsive) classes.push(...responsive);
+          else warnings.push(`Grid ${name} responsive value could not be mapped; set the gap manually`);
+        }
         continue;
       }
       if (["xs", "sm", "md", "lg", "xl"].includes(name)) {
@@ -757,6 +848,7 @@ export function sxFile(sourceFile: SourceFile, fullText: string): SxResult {
     const classes: string[] = [];
     const consumed = new Set<string>();
     let leftover: string[] = [];
+    let sxUnconverted = false;
 
     if (isLayout) {
       const layout = collectLayoutProps(node, layoutCanonical(tag, bindings));
@@ -776,7 +868,13 @@ export function sxFile(sourceFile: SourceFile, fullText: string): SxResult {
           warnings.push(`line ${line} <${tag}>: sx partially converted; ${converted.leftover.length} property(ies) remain in sx`);
         }
       } else {
-        warnings.push(`line ${line} <${tag}>: sx is not an object literal; convert manually`);
+        // Callback / array / variable sx we cannot statically convert. Keep the
+        // original attribute verbatim (below) so the styling source survives for
+        // the manual/LLM pass instead of being silently deleted.
+        sxUnconverted = true;
+        warnings.push(
+          `line ${line} <${tag}>: sx is not an object literal (callback/array/variable); kept verbatim on the element — convert it manually`,
+        );
       }
     }
 
@@ -796,6 +894,7 @@ export function sxFile(sourceFile: SourceFile, fullText: string): SxResult {
         if (name === "className") continue;
         if (name === "sx") {
           if (leftover.length) parts.push(`sx={{ ${leftover.join(", ")} }}`);
+          else if (sxUnconverted) parts.push(attribute.getText());
           continue;
         }
         if (consumed.has(name)) continue;
