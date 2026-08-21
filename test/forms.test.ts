@@ -90,3 +90,14 @@ test("FormControl consumes error/required/component (no invalid div attrs) and w
   assert.doesNotMatch(result.text, /<div[^>]*\b(error|required|component)\b/);
   assert.ok(result.warnings.some((w) => w.includes("FormControl error dropped")));
 });
+
+test("TextField slotProps/inputProps/inputRef/size are consumed, not leaked onto Input", () => {
+  const result = migrate(
+    'import { TextField } from "@mui/material";\n' +
+      'export const A = () => <TextField label="Code" slotProps={{ htmlInput: { maxLength: 5 } }} size="small" inputRef={undefined} />;\n',
+  );
+  assert.doesNotMatch(result.text, /slotProps/);
+  assert.doesNotMatch(result.text, /inputRef/);
+  assert.doesNotMatch(result.text, /size="small"/);
+  assert.ok(result.warnings.some((w) => w.includes("slotProps")));
+});
