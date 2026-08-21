@@ -23,6 +23,12 @@ Fidelity pass (v0.6, in progress): converting common APIs faithfully rather than
 - **Badge hides when it should.** `invisible={…}` gates the emitted Badge, and a numeric `badgeContent` hides at zero by default (MUI `showZero=false`), instead of always rendering a `0`.
 - **Bare `<LinearProgress />` warns.** The indeterminate default (no `value`) now warns that shadcn Progress has no indeterminate mode and would render a frozen empty bar.
 
+### Added
+
+- **`Button loading` and `@mui/lab` `LoadingButton`.** `loading` (core Button since v6.4, and every LoadingButton) now disables the button (merging with an existing `disabled`) and prepends a `Loader2` spinner, instead of leaking `loading` to the DOM or leaving `@mui/lab` imported.
+- **`ButtonGroup` → shadcn `button-group`.** Previously unmapped (children were converted underneath a retained MUI wrapper). Now maps to the shadcn `ButtonGroup`, keeping `orientation`; group-level `variant`/`color`/`size` (MUI context props) are warned since shadcn does not propagate them.
+- **`AvatarGroup` → overlapping stack.** Previously unmapped. Now becomes `<div className="flex -space-x-2">` (shadcn's documented avatar-stack pattern) with the child Avatars converting normally; `max`/`renderSurplus` are warned (the +N badge needs manual work).
+
 ## [0.5.0] - 2026-08-21
 
 Scale-hardening pass toward migrating very large (10k+ component) enterprise codebases as completely and correctly as possible. Focus: stop silently skipping whole classes of files, stop emitting non-compiling output, and stop destroying styling.
