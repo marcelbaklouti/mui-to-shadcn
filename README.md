@@ -98,11 +98,11 @@ console.log(result.text, result.warnings, result.manual, result.components);
 
 ## Component support
 
-115 MUI components are catalogued. As of the current version: **99 fully converted**, **7 converted inside their parent**, **4 partial**, **5 left manual** with a note. The full, always-current table is generated from the registry:
+118 MUI components are catalogued. As of the current version: **102 fully converted**, **7 converted inside their parent**, **4 partial**, **5 left manual** with a note. The full, always-current table is generated from the registry:
 
 - [docs/COMPONENTS.md](./docs/COMPONENTS.md) — full status table (regenerate with `npm run docs`)
 
-Fully converted include Button, IconButton, ButtonBase, Checkbox, Switch, RadioGroup, FormControlLabel (control converted inline), TextField, Select, the Form/Input primitives, Divider, LinearProgress, CircularProgress (lucide spinner), Skeleton, Paper, the Card family (incl. CardMedia, CardActionArea), Alert, Link, Typography, Avatar, Chip, Badge, Tooltip, Tabs (incl. the MUI Lab TabContext/TabList/TabPanel), Accordion, Dialog (incl. standalone parts), Modal, Menu (DropdownMenu), Popover/Popper, Collapse (Collapsible), ToggleButtonGroup, Drawer/SwipeableDrawer (Sheet), Breadcrumbs, Pagination, the Table family (incl. TableSortLabel), the List family, the Stepper family, the Timeline family (semantic markup), Rating (lucide stars), the Transition components (unwrapped), Fab, AppBar/Toolbar, ImageList, and Box/Stack/Container.
+Fully converted include Button (incl. `loading`), the @mui/lab LoadingButton, ButtonGroup, IconButton, ButtonBase, Checkbox, Switch, RadioGroup, FormControlLabel (control converted inline), TextField (incl. `select` → Select), Select, the Form/Input primitives, Divider, LinearProgress, CircularProgress (lucide spinner), Skeleton, Paper, the Card family (incl. CardMedia, CardActionArea), Alert (severity-tinted), Link, Typography, Avatar, AvatarGroup, Chip (incl. `onDelete`), Badge, Tooltip, Tabs (incl. the MUI Lab TabContext/TabList/TabPanel), Accordion, Dialog (incl. sizing + standalone parts), Modal, Menu (DropdownMenu), Popover/Popper, Collapse (Collapsible), ToggleButtonGroup, Drawer/SwipeableDrawer (Sheet; permanent → aside), Breadcrumbs, Pagination, the Table family (incl. TableSortLabel), the List family, the Stepper family, the Timeline family (semantic markup), Rating (lucide stars), the Transition components (gated on `in`), Fab, AppBar/Toolbar, ImageList, and Box/Stack/Container.
 
 Plus icons: `@mui/icons-material` → `lucide-react` (~700 names mapped).
 

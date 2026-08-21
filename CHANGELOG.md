@@ -4,7 +4,9 @@ All notable changes to this project are documented here. This project adheres to
 
 ## [Unreleased]
 
-Fidelity pass (v0.6, in progress): converting common APIs faithfully rather than dropping them.
+## [0.6.0] - 2026-08-21
+
+Fidelity pass: converting common APIs faithfully rather than dropping them, plus new mappings for previously-unmapped components.
 
 ### Fixed
 
