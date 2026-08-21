@@ -4,6 +4,13 @@ All notable changes to this project are documented here. This project adheres to
 
 ## [Unreleased]
 
+Theming pass (v0.7, in progress): carry the brand across so the migration looks right, not default.
+
+### Added
+
+- **Brand tokens from `createTheme()`.** `--setup` now scans a `createTheme`/`extendTheme` palette and, after `shadcn init` writes its defaults, appends a `:root` override with the mapped shadcn CSS variables — `palette.primary.main` → `--primary`, `secondary.main` → `--secondary`, `error.main` → `--destructive`, `background.default`/`paper` → `--background`/`--card`, `text.primary`/`secondary` → `--foreground`/`--muted-foreground`, `divider` → `--border`, and `shape.borderRadius` → `--radius`. Values that can't be statically evaluated are skipped (not crashed on). Exposed as `scanThemeTokens`/`buildThemeCss` for programmatic use.
+- **Dark-mode and custom-spacing signals.** A `palette.mode: "dark"` theme prints a note to add `class="dark"` to `<html>`; a custom `theme.spacing` (≠ 8) prints a warning that converted spacing classes assume the 8px default.
+
 ## [0.6.0] - 2026-08-21
 
 Fidelity pass: converting common APIs faithfully rather than dropping them, plus new mappings for previously-unmapped components.
