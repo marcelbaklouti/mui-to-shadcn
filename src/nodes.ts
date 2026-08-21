@@ -1,6 +1,28 @@
 import { Node, SyntaxKind } from "ts-morph";
+import type { SourceFile } from "ts-morph";
 import type { Edit } from "./edits.js";
 import type { JsxElementLike } from "./types.js";
+
+// True if `localName` appears anywhere other than in an import or as a JSX tag
+// name — i.e. it is used as a value (styled(X), component={X}, { icon: X },
+// X.propTypes, …). Such references would dangle if the import were removed, so
+// callers use this to avoid removing (or to alias) the import.
+export function hasNonTagReference(sourceFile: SourceFile, localName: string): boolean {
+  for (const id of sourceFile.getDescendantsOfKind(SyntaxKind.Identifier)) {
+    if (id.getText() !== localName) continue;
+    if (id.getFirstAncestorByKind(SyntaxKind.ImportDeclaration)) continue;
+    const kind = id.getParent()?.getKind();
+    if (
+      kind === SyntaxKind.JsxOpeningElement ||
+      kind === SyntaxKind.JsxSelfClosingElement ||
+      kind === SyntaxKind.JsxClosingElement
+    ) {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
 
 export function getTagName(node: JsxElementLike): string {
   const opening = Node.isJsxElement(node) ? node.getOpeningElement() : node;
