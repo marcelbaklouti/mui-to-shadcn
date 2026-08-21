@@ -19,6 +19,30 @@ import {
   renameTagEdits,
 } from "./nodes.js";
 
+// Forward behavior-bearing/passthrough Tab attributes (disabled, onClick,
+// className, data-*, aria-*) onto TabsTrigger; drop the MUI-only ones.
+const TAB_SKIP_ATTRS = new Set([
+  "value",
+  "label",
+  "icon",
+  "iconPosition",
+  "wrapped",
+  "disableRipple",
+  "disableFocusRipple",
+  "sx",
+  "key",
+  "ref",
+]);
+
+function tabTriggerExtraAttributes(element: ParsedElement): string {
+  const parts: string[] = [];
+  for (const entry of element.attributes) {
+    if (TAB_SKIP_ATTRS.has(entry.name)) continue;
+    parts.push(renderAttribute({ name: entry.name, value: entry.value }));
+  }
+  return parts.length ? " " + parts.join(" ") : "";
+}
+
 function reindentBlock(replacement: string, indent: string): string {
   if (!indent) return replacement;
   return replacement
@@ -190,14 +214,20 @@ export function accordionContainer(context: ContainerContext): ContainerEdit[] {
     names: ["Accordion", "AccordionContent", "AccordionItem", "AccordionTrigger"],
     moduleSpecifier: "@/components/ui/accordion",
   });
-  if (attribute(element, "expanded") || attribute(element, "onChange") || attribute(element, "defaultExpanded")) {
-    context.warn("Accordion expanded/onChange dropped; shadcn is controlled via value (type single/multiple)");
+  const defaultExpanded = attribute(element, "defaultExpanded");
+  const rootDefault = defaultExpanded ? ` defaultValue="item-1"` : "";
+  if (attribute(element, "expanded") || attribute(element, "onChange")) {
+    context.warn(
+      'Accordion controlled expanded/onChange dropped; drive it via value/onValueChange on the shadcn Accordion (item value "item-1")',
+    );
   }
+  const disabled = attribute(element, "disabled");
+  const itemDisabled = disabled ? " " + renderAttribute({ name: "disabled", value: disabled.value }) : "";
 
   const edits: ContainerEdit[] = emitWrap(
     context,
-    `<Accordion type="single" collapsible>`,
-    `\n${indent}  <AccordionItem value="item-1">`,
+    `<Accordion type="single" collapsible${rootDefault}>`,
+    `\n${indent}  <AccordionItem value="item-1"${itemDisabled}>`,
     `${indent}  </AccordionItem>\n${indent}`,
     "</Accordion>",
   );
@@ -283,7 +313,7 @@ export function tabsContainer(context: ContainerContext): ContainerEdit[] {
     edits.push({
       start: child.getStart(),
       end: child.getEnd(),
-      replacement: `<TabsTrigger${valueText}>${labelText}</TabsTrigger>`,
+      replacement: `<TabsTrigger${valueText}${tabTriggerExtraAttributes(childElement)}>${labelText}</TabsTrigger>`,
     });
   }
   return edits;
@@ -603,13 +633,27 @@ export function tooltipContainer(context: ContainerContext): ContainerEdit[] {
   const titleChild = title ? valueAsChild(title.value) : "";
   if (!title) context.warn("Tooltip without title; add the TooltipContent manually");
 
+  // enterDelay -> delayDuration on the provider; className/sx -> TooltipContent.
+  const enterDelay = attribute(element, "enterDelay");
+  const delayText = enterDelay ? ` delayDuration=${renderAttributeValue(enterDelay.value)}` : "";
+  const classNameAttr = attribute(element, "className");
+  const contentClass =
+    classNameAttr && classNameAttr.value.kind === "string" ? ` className="${classNameAttr.value.value}"` : "";
+
+  // Warn about the behavior-bearing props we cannot map cleanly.
+  const handled = new Set(["title", "placement", "enterDelay", "className", "children", "key", "ref"]);
+  const dropped = element.attributes.map((entry) => entry.name).filter((name) => !handled.has(name));
+  if (dropped.length) {
+    context.warn(`Tooltip prop(s) ${dropped.join(", ")} dropped; map open/onOpen/onClose/arrow/leaveDelay manually`);
+  }
+
   const triggerOpen = context.base === "base" ? "<TooltipTrigger>" : "<TooltipTrigger asChild>";
   if (context.base === "base") {
     context.warn("Base UI: TooltipTrigger does not use asChild; use the render prop instead");
   }
   const innerOpen = `\n${indent}  <Tooltip>\n${indent}    ${triggerOpen}`;
-  const innerClose = `${indent}    </TooltipTrigger>\n${indent}    <TooltipContent side="${side}">${titleChild}</TooltipContent>\n${indent}  </Tooltip>\n${indent}`;
-  return emitWrap(context, "<TooltipProvider>", innerOpen, innerClose, "</TooltipProvider>");
+  const innerClose = `${indent}    </TooltipTrigger>\n${indent}    <TooltipContent side="${side}"${contentClass}>${titleChild}</TooltipContent>\n${indent}  </Tooltip>\n${indent}`;
+  return emitWrap(context, `<TooltipProvider${delayText}>`, innerOpen, innerClose, "</TooltipProvider>");
 }
 
 // A `<TextField select>` is MUI's dropdown-with-label idiom; convert it to the
@@ -1049,7 +1093,21 @@ export function badgeContainer(context: ContainerContext): ContainerEdit[] {
   const badgeClass = isDot ? "absolute -right-1 -top-1 size-2 rounded-full p-0" : "absolute -right-2 -top-2";
   const badgeInner = isDot ? "" : content ? valueAsChild(content.value) : "";
 
-  const innerClose = `\n${indent}  <Badge${badgeVariant} className="${badgeClass}">${badgeInner}</Badge>\n${indent}`;
+  // Gate the badge so it hides when appropriate: an explicit `invisible`
+  // expression, or MUI's default of hiding a zero badgeContent (showZero=false).
+  const invisible = attribute(element, "invisible");
+  let gateOpen = "";
+  let gateClose = "";
+  if (invisible && invisible.value.kind === "expression") {
+    gateOpen = `{!(${invisible.value.expression}) && `;
+    gateClose = "}";
+  } else if (!isDot && content && content.value.kind === "expression" && !attribute(element, "showZero")) {
+    gateOpen = `{Boolean(${content.value.expression}) && `;
+    gateClose = "}";
+  }
+
+  const badge = `<Badge${badgeVariant} className="${badgeClass}">${badgeInner}</Badge>`;
+  const innerClose = `\n${indent}  ${gateOpen}${badge}${gateClose}\n${indent}`;
   return emitWrap(context, `<span className="relative inline-flex">`, "", innerClose, "</span>");
 }
 
@@ -1168,7 +1226,7 @@ export function tabContextContainer(context: ContainerContext): ContainerEdit[] 
       edits.push({
         start: descendant.getStart(),
         end: descendant.getEnd(),
-        replacement: `<TabsTrigger${valueText}>${labelText}</TabsTrigger>`,
+        replacement: `<TabsTrigger${valueText}${tabTriggerExtraAttributes(tabElement)}>${labelText}</TabsTrigger>`,
       });
     } else if (canonical === "TabPanel") {
       const panelElement = parseElement(descendant, fullText);
