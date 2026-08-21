@@ -1,5 +1,5 @@
 import type { AttributeValue, ComponentMapping, Registry } from "./types.js";
-import { alertResolver, fabResolver, iconButtonResolver, listItemButtonResolver } from "./resolvers.js";
+import { alertResolver, fabResolver, iconButtonResolver, listItemButtonResolver, menuItemResolver } from "./resolvers.js";
 import {
   avatarTransform,
   buttonTransform,
@@ -33,7 +33,7 @@ import {
   tabContextContainer,
   tableHeadContainer,
   tabsContainer,
-  textFieldTransform,
+  textFieldContainer,
   timelineContainer,
   toggleGroupContainer,
   tooltipContainer,
@@ -270,7 +270,7 @@ export function buildRegistry(): Registry {
   registry.Tooltip = { containerTransform: tooltipContainer };
   registry.Chip = { transform: chipTransform };
 
-  registry.TextField = { transform: textFieldTransform };
+  registry.TextField = { containerTransform: textFieldContainer };
 
   registry.Select = { containerTransform: selectContainer };
   registry.Accordion = { containerTransform: accordionContainer };
@@ -285,13 +285,7 @@ export function buildRegistry(): Registry {
   registry.MenuItem = {
     target: "SelectItem",
     importPath: "@/components/ui/select",
-    props: {
-      onClick: { drop: true, warning: "MenuItem onClick dropped; SelectItem responds via the Select's onValueChange" },
-      dense: { drop: true },
-      divider: { drop: true },
-      disableGutters: { drop: true },
-      selected: { drop: true },
-    },
+    resolve: menuItemResolver,
   };
 
   registry.Slider = {
@@ -423,14 +417,21 @@ export function buildRegistry(): Registry {
   registry.FormHelperText = { transform: formHelperTextTransform };
   registry.FormControl = {
     target: "div",
+    defaultClassName: "grid gap-1.5",
     props: {
       fullWidth: { toClassName: () => "w-full" },
       variant: { drop: true },
       margin: { drop: true },
       size: { drop: true },
-      error: { drop: true },
+      // MUI propagates these to nested inputs via context; shadcn has no such
+      // context, so consume them (no invalid <div> attrs) and flag the loss.
+      error: { drop: true, warning: "FormControl error dropped; add aria-invalid/text-destructive to the nested input and FormMessage manually" },
+      required: { drop: true, warning: "FormControl required dropped; add required to the nested input(s)" },
+      disabled: { drop: true, warning: "FormControl disabled dropped; add disabled to the nested input(s)" },
+      component: { drop: true, warning: "FormControl component dropped; change the wrapper tag (e.g. fieldset) manually" },
       focused: { drop: true },
       hiddenLabel: { drop: true },
+      color: { drop: true },
     },
   };
   registry.FormGroup = {

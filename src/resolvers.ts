@@ -28,6 +28,44 @@ export function resolveButtonVariant(
   return undefined;
 }
 
+function isEmptyStringValue(value: AttributeValue): boolean {
+  if (value.kind === "string") return value.value === "";
+  if (value.kind === "expression") return /^\s*(['"])\1\s*$/.test(value.expression);
+  return false;
+}
+
+// MenuItem -> SelectItem. Radix Select.Item throws on an empty value, so the MUI
+// placeholder idiom `<MenuItem value="">` is remapped to a "none" sentinel with
+// a warning; onClick is dropped (Select responds via onValueChange).
+export const menuItemResolver: InPlaceResolver = (attributes, helpers) => {
+  const generated: { name: string; value: AttributeValue }[] = [];
+  for (const attribute of attributes) {
+    switch (attribute.name) {
+      case "value":
+        if (isEmptyStringValue(attribute.value)) {
+          helpers.warn(
+            'MenuItem value="" is invalid in a shadcn Select (Radix throws on an empty value); mapped to value="none" — handle the clear-selection case in your onValueChange',
+          );
+          generated.push({ name: "value", value: { kind: "string", value: "none" } });
+        } else {
+          generated.push({ name: "value", value: attribute.value });
+        }
+        break;
+      case "onClick":
+        helpers.warn("MenuItem onClick dropped; SelectItem responds via the Select's onValueChange");
+        break;
+      case "dense":
+      case "divider":
+      case "disableGutters":
+      case "selected":
+        break;
+      default:
+        generated.push({ name: attribute.name, value: attribute.value });
+    }
+  }
+  return { attributes: generated, classNames: [] };
+};
+
 export const iconButtonResolver: InPlaceResolver = (attributes, helpers) => {
   const generated: { name: string; value: AttributeValue }[] = [
     { name: "variant", value: { kind: "string", value: "ghost" } },
