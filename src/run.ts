@@ -19,6 +19,20 @@ export interface MigrationResult {
   warnings: string[];
   manual: ManualHit[];
   components: string[];
+  /** Distinct @mui/@material-ui module specifiers still present after migration. */
+  residualMui: string[];
+}
+
+// Quoted module specifiers that mean the file is not (fully) off MUI yet. Covers
+// v5+ (@mui/*), v4 (@material-ui/*), and the styling engine (@emotion/*).
+const RESIDUAL_MUI_RE = /["'](@mui\/[^"']+|@material-ui\/[^"']+|@emotion\/[^"']+)["']/g;
+
+function collectResidualMui(text: string): string[] {
+  const found = new Set<string>();
+  for (const match of text.matchAll(RESIDUAL_MUI_RE)) {
+    if (match[1]) found.add(match[1]);
+  }
+  return [...found].sort();
 }
 
 export interface MigrationOptions {
@@ -108,11 +122,24 @@ export function runMigration(sourceFile: SourceFile, options: MigrationOptions =
     text = insertImportBlock(text, 'import { cn } from "@/lib/utils";');
   }
 
+  // Safety net: a file whose output still imports @mui/@material-ui/@emotion is
+  // not fully migrated. This catches every silent-skip class (namespace imports,
+  // internal re-export barrels, v4 packages, unmapped components, dangling type
+  // imports) that would otherwise leave zero trace in the report or MIGRATION.md.
+  const residualMui = collectResidualMui(text);
+  if (residualMui.length) {
+    activeWarnings.push(
+      `still references ${residualMui.join(", ")}; this file is not fully migrated ` +
+        `(unsupported import shape, a component left for manual work, or a dangling type import)`,
+    );
+  }
+
   return {
     changed: text !== originalText,
     text,
     warnings: activeWarnings,
     manual,
     components: collectComponents(plan.imports),
+    residualMui,
   };
 }

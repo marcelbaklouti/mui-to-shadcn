@@ -5,14 +5,20 @@ export interface PartitionedInputs {
   globs: string[];
 }
 
+// React/MUI code lives in .ts/.tsx but also plain .js/.jsx (CRA and v4-era
+// codebases) and the ESM/CJS variants. ts-morph parses JSX in all of them.
+const SOURCE_EXTENSIONS = ["ts", "tsx", "js", "jsx", "mjs", "cjs"];
+const SOURCE_EXTENSION_RE = new RegExp(`\\.(${SOURCE_EXTENSIONS.join("|")})$`);
+const SOURCE_GLOB_SUFFIX = `/**/*.{${SOURCE_EXTENSIONS.join(",")}}`;
+
 export function partitionInputs(inputs: string[]): PartitionedInputs {
   const files: string[] = [];
   const globs: string[] = [];
   for (const input of inputs) {
-    if (/\.(ts|tsx)$/.test(input)) {
+    if (SOURCE_EXTENSION_RE.test(input)) {
       files.push(input);
     } else {
-      globs.push(`${input.replace(/\/+$/, "")}/**/*.{ts,tsx}`);
+      globs.push(`${input.replace(/\/+$/, "")}${SOURCE_GLOB_SUFFIX}`);
     }
   }
   if (globs.length) globs.push("!**/node_modules/**");

@@ -3,7 +3,7 @@ import { parseArgs } from "node:util";
 import { writeFileSync } from "node:fs";
 import { relative, join } from "node:path";
 import { createRequire } from "node:module";
-import { Project } from "ts-morph";
+import { Project, ts } from "ts-morph";
 import { runMigration } from "./run.js";
 import { collectSourceFiles } from "./paths.js";
 import { runSetup } from "./setup.js";
@@ -94,6 +94,9 @@ async function main(): Promise<void> {
   const project = new Project({
     skipAddingFilesFromTsConfig: true,
     useInMemoryFileSystem: false,
+    // allowJs + jsx so .js/.jsx sources (CRA and v4-era codebases) are parsed
+    // with JSX support, not just .ts/.tsx.
+    compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve },
   });
 
   const files = collectSourceFiles(project, positionals);
@@ -108,6 +111,7 @@ async function main(): Promise<void> {
 
   let changedCount = 0;
   let warningCount = 0;
+  let residualMuiCount = 0;
   const manualTotals = new Map<string, number>();
   const components = new Set<string>();
   const reports: FileReport[] = [];
@@ -116,6 +120,7 @@ async function main(): Promise<void> {
     const result = runMigration(file, { sx: applySx, base });
     const rel = relative(process.cwd(), file.getFilePath());
     warningCount += result.warnings.length;
+    if (result.residualMui.length) residualMuiCount += 1;
     for (const slug of result.components) components.add(slug);
     for (const hit of result.manual) {
       manualTotals.set(hit.component, (manualTotals.get(hit.component) ?? 0) + 1);
@@ -150,6 +155,11 @@ async function main(): Promise<void> {
     console.log(`Files with changes: ${changedCount} (dry run, nothing written)`);
   }
   console.log(`Warnings: ${warningCount}`);
+  if (residualMuiCount > 0) {
+    console.log(
+      `Files still referencing MUI: ${residualMuiCount} (not fully migrated — see the warnings/MIGRATION.md)`,
+    );
+  }
 
   const componentList = [...components].sort();
   if (componentList.length) {

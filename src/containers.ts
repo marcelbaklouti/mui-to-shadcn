@@ -99,6 +99,14 @@ function renderRootAttributes(element: ParsedElement, options: RootOptions): str
     if (entry.name === "sx") options.context.warn("sx retained; run the sx conversion step");
     parts.push(renderAttribute({ name: entry.name, value: entry.value }));
   }
+  // Preserve spread props ({...register(...)}, {...field}) instead of silently
+  // dropping them — they carry the form binding (name/value/onChange/ref).
+  for (const spread of element.spreads) parts.push(spread.text);
+  if (element.spreads.length) {
+    options.context.warn(
+      "spread props kept on the element; verify they match the shadcn API (e.g. react-hook-form onChange vs onValueChange)",
+    );
+  }
   return parts.length ? " " + parts.join(" ") : "";
 }
 
@@ -274,6 +282,10 @@ export function radioGroupContainer(context: ContainerContext): ContainerEdit[] 
   const edits: ContainerEdit[] = [
     { start: open.start, end: open.end, replacement: `<RadioGroup${rootAttributes}${selfClosingMarker(context)}` },
   ];
+  // Rewrite the closing tag too (a no-op unless the MUI import was aliased,
+  // e.g. `RadioGroup as MuiRadioGroup`, where </MuiRadioGroup> would mismatch).
+  const close = closingElementRange(node);
+  if (close) edits.push({ start: close.start, end: close.end, replacement: "</RadioGroup>" });
 
   for (const child of childJsxElements(node)) {
     const canonical = context.localToCanonical.get(getTagName(child));
@@ -395,6 +407,10 @@ export function toggleGroupContainer(context: ContainerContext): ContainerEdit[]
   const edits: ContainerEdit[] = [
     { start: open.start, end: open.end, replacement: `<ToggleGroup type="${type}"${rootAttributes}${selfClosingMarker(context)}` },
   ];
+  // The target tag (ToggleGroup) differs from the source, so the closing tag
+  // must be rewritten too or the JSX will not parse.
+  const close = closingElementRange(node);
+  if (close) edits.push({ start: close.start, end: close.end, replacement: "</ToggleGroup>" });
 
   for (const child of childJsxElements(node)) {
     const canonical = context.localToCanonical.get(getTagName(child));
@@ -555,6 +571,12 @@ export const textFieldTransform: CompositeTransform = (context) => {
     if (consumed.has(entry.name)) continue;
     if (entry.name === "sx") context.warn("sx retained; run the sx conversion step");
     fieldParts.push(renderAttribute({ name: entry.name, value: entry.value }));
+  }
+  // Keep spread props ({...register("email")}, {...field}) on the input — they
+  // carry the form binding and must not be silently dropped.
+  for (const spread of element.spreads) fieldParts.push(spread.text);
+  if (element.spreads.length) {
+    context.warn("spread props ({...register}/{...field}) kept on the input; verify the binding still matches");
   }
 
   if (attribute(element, "select")) context.warn("TextField select: use the Select pattern instead");

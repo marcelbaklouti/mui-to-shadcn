@@ -4,6 +4,25 @@ All notable changes to this project are documented here. This project adheres to
 
 ## [Unreleased]
 
+Scale-hardening pass toward migrating very large (10k+ component) enterprise codebases as completely and correctly as possible. Focus: stop silently skipping whole classes of files, stop emitting non-compiling output, and stop destroying styling.
+
+### Added
+
+- **`.js`/`.jsx` (and `.mjs`/`.cjs`) files are now scanned.** CRA- and v4-era codebases are largely `.jsx`; they were silently ignored on directory scans. The project is now opened with `allowJs`/`jsx` so JSX in these files is parsed and converted.
+- **v4 support (`@material-ui/*`).** `@material-ui/core`, `@material-ui/lab`, and `@material-ui/icons` are now recognized (component/icon names are identical to v5), so v4 codebases actually convert instead of reporting "0 changes". v4 theming infra is handled too: `MuiThemeProvider` is unwrapped and `createMuiTheme` is flagged.
+- **`@mui/system` support.** `Box`/`Stack`/`Container`/`Grid` imported from `@mui/system` (a common bundle-conscious pattern) now convert like their `@mui/material` equivalents, and the import is removed. Non-component exports (`styled`, `useTheme`, …) are left in place.
+- **End-of-run "still references MUI" safety net.** Every file whose output still imports `@mui/*`, `@material-ui/*`, or `@emotion/*` now emits a warning and is counted in a new `Files still referencing MUI: N` CLI summary line (and exposed as `residualMui` on the programmatic result). This surfaces every silent-skip class (namespace imports, internal re-export barrels, unmapped components, dangling type imports) that previously left no trace in the report or `MIGRATION.md`.
+
+### Fixed
+
+- **Non-object `sx` is no longer deleted.** `sx={(theme) => …}`, `sx={[…]}`, and `sx={variable}` were dropped entirely, destroying the styling. They are now kept verbatim on the element (with a warning) so the source survives for the manual/LLM pass.
+- **Arbitrary `sx` values with spaces produce one valid class.** `maxWidth: "calc(100% - 32px)"`, `flex: "1 1 auto"`, etc. now emit `max-w-[calc(100%_-_32px)]` / `flex-[1_1_auto]` instead of a space-broken class string; a trailing `!important` is stripped.
+- **Fractional sizing.** MUI treats `width`/`height` numbers in `(0, 1]` as percentages: `width: 1` → `w-full`, `0.5` → `w-1/2` — no longer `w-[1px]`.
+- **Numeric `flex`.** `sx={{ flex: 1 }}` → `flex-1` (was left as broken leftover `sx`).
+- **Responsive `Stack`/`Grid` props.** `direction={{ xs: "column", sm: "row" }}`, `spacing={{ xs: 1, md: 4 }}`, and Grid `spacing`/`columns` breakpoint objects now emit breakpoint-prefixed classes (`sm:flex-row`, `md:gap-8`, `md:grid-cols-12`) instead of being silently dropped.
+- **`ToggleButtonGroup` closing tag.** The root was rewritten to `<ToggleGroup>` but the closing tag stayed `</ToggleButtonGroup>`, so every non-self-closing group produced non-parsing JSX. The closing tag is now rewritten too. Same fix for an aliased `RadioGroup` (`RadioGroup as MuiRadioGroup`).
+- **Spread props are preserved.** `<TextField {...register("email")} />` and `<Select {...field}>` (react-hook-form / Formik) silently lost the spread. Spreads are now kept on the emitted element across the container transforms and `TextField`, with a warning to verify the binding.
+
 ## [0.4.1] - 2026-06-23
 
 Fixes `shadcn init` failing with `Invalid preset: radix-nova` / `base-nova`. shadcn CLI v4 expects the style as `--preset` (e.g. `nova`) and the primitive library as a separate `--base radix|base` flag, not a combined `{base}-{style}` name.

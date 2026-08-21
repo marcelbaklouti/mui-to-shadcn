@@ -11,7 +11,16 @@ import { applyEdits, resolveOverlaps } from "./edits.js";
 import { insertImportBlock } from "./imports.js";
 import { lucideForMuiIcon } from "./icon-map.js";
 
-const ICONS_BARREL = "@mui/icons-material";
+// v5 (@mui/icons-material) and v4 (@material-ui/icons) share the same icon names.
+const ICON_BARRELS = ["@mui/icons-material", "@material-ui/icons"];
+
+function iconBarrelFor(moduleSpecifier: string): string | null {
+  for (const barrel of ICON_BARRELS) {
+    if (moduleSpecifier === barrel) return barrel;
+    if (moduleSpecifier.startsWith(barrel + "/")) return barrel;
+  }
+  return null;
+}
 
 export interface IconResult {
   text: string;
@@ -50,8 +59,9 @@ function trailingNewlineLength(fullText: string, position: number): number {
 }
 
 function deepIconName(moduleSpecifier: string): string | null {
-  if (!moduleSpecifier.startsWith(ICONS_BARREL + "/")) return null;
-  const segment = moduleSpecifier.slice(ICONS_BARREL.length + 1).replace(/^esm\//, "");
+  const barrel = iconBarrelFor(moduleSpecifier);
+  if (!barrel || moduleSpecifier === barrel) return null;
+  const segment = moduleSpecifier.slice(barrel.length + 1).replace(/^esm\//, "");
   const name = segment.split("/").pop() ?? "";
   return name || null;
 }
@@ -60,7 +70,7 @@ function collectIconBindings(sourceFile: SourceFile): IconBinding[] {
   const bindings: IconBinding[] = [];
   for (const declaration of sourceFile.getImportDeclarations()) {
     const moduleSpecifier = declaration.getModuleSpecifierValue();
-    if (moduleSpecifier === ICONS_BARREL) {
+    if (iconBarrelFor(moduleSpecifier) === moduleSpecifier) {
       for (const named of declaration.getNamedImports()) {
         const muiName = named.getNameNode().getText();
         const alias = named.getAliasNode();
@@ -294,7 +304,7 @@ export function iconsFile(sourceFile: SourceFile, fullText: string): IconResult 
   // Remove (or trim) @mui/icons-material imports for converted icons.
   for (const declaration of sourceFile.getImportDeclarations()) {
     const moduleSpecifier = declaration.getModuleSpecifierValue();
-    const isBarrel = moduleSpecifier === ICONS_BARREL;
+    const isBarrel = iconBarrelFor(moduleSpecifier) === moduleSpecifier;
     const deep = deepIconName(moduleSpecifier);
     if (!isBarrel && !deep) continue;
 

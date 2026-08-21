@@ -2,7 +2,17 @@ import type { ImportDeclaration, SourceFile } from "ts-morph";
 import type { Edit } from "./edits.js";
 import type { ImportRequest } from "./types.js";
 
-const MUI_BARRELS = ["@mui/material", "@mui/lab"];
+const MUI_BARRELS = [
+  "@mui/material",
+  "@mui/lab",
+  // @mui/system re-exports Box/Stack/Container/Grid; non-component exports
+  // (styled, useTheme, sx helpers) are never JSX tags, so they are ignored by
+  // the component/sx passes and left in place by the import trimmer.
+  "@mui/system",
+  // v4 packages: component names are identical to v5.
+  "@material-ui/core",
+  "@material-ui/lab",
+];
 
 function matchBarrel(moduleSpecifier: string): { barrel: string; deep: boolean } | null {
   for (const barrel of MUI_BARRELS) {
