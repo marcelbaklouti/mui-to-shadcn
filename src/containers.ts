@@ -110,6 +110,21 @@ function renderRootAttributes(element: ParsedElement, options: RootOptions): str
   return parts.length ? " " + parts.join(" ") : "";
 }
 
+// className/sx on a shadcn Radix root (Select/Dialog/Sheet/DropdownMenu/Popover
+// are bare `*.Root` re-exports that render no DOM node) are a compile error.
+// Extract them here so the caller can place them on the content element instead;
+// an sx placed on the content element is then converted by the sx pass.
+function contentStyleAttributes(element: ParsedElement): string {
+  const parts: string[] = [];
+  const className = attribute(element, "className");
+  if (className) parts.push(renderAttribute({ name: "className", value: className.value }));
+  const sx = attribute(element, "sx");
+  if (sx) parts.push(`sx=${renderAttributeValue(sx.value)}`);
+  return parts.length ? " " + parts.join(" ") : "";
+}
+
+const ROOT_STYLE_DROP = ["className", "sx"];
+
 export function selectContainer(context: ContainerContext): ContainerEdit[] {
   const { element, node, indent } = context;
   context.registerImport({
@@ -146,14 +161,16 @@ export function selectContainer(context: ContainerContext): ContainerEdit[] {
       "autoWidth",
       "id",
       "error",
+      ...ROOT_STYLE_DROP,
     ]),
   });
+  const triggerStyle = contentStyleAttributes(element);
 
   const placeholderText = placeholder ? ` placeholder="${placeholder}"` : "";
   if (!closingElementRange(node)) {
     context.warn("Select without options; add SelectItem elements");
   }
-  const innerOpen = `\n${indent}  <SelectTrigger>\n${indent}    <SelectValue${placeholderText} />\n${indent}  </SelectTrigger>\n${indent}  <SelectContent>`;
+  const innerOpen = `\n${indent}  <SelectTrigger${triggerStyle}>\n${indent}    <SelectValue${placeholderText} />\n${indent}  </SelectTrigger>\n${indent}  <SelectContent>`;
   const innerClose = `${indent}  </SelectContent>\n${indent}`;
   return emitWrap(context, `<Select${rootAttributes}>`, innerOpen, innerClose, "</Select>");
 }
@@ -341,13 +358,14 @@ export function dialogContainer(context: ContainerContext): ContainerEdit[] {
       "keepMounted",
       "slotProps",
       "slots",
+      ...ROOT_STYLE_DROP,
     ]),
   });
 
   const edits: ContainerEdit[] = emitWrap(
     context,
     `<Dialog${rootAttributes}>`,
-    `\n${indent}  <DialogContent>`,
+    `\n${indent}  <DialogContent${contentStyleAttributes(element)}>`,
     `${indent}  </DialogContent>\n${indent}`,
     "</Dialog>",
   );
@@ -453,13 +471,13 @@ export function drawerContainer(context: ContainerContext): ContainerEdit[] {
   const rootAttributes = renderRootAttributes(element, {
     context,
     rename: new Map([["onClose", "onOpenChange"]]),
-    drop: new Set(["anchor", "variant", "elevation", "ModalProps", "PaperProps", "hideBackdrop", "transitionDuration", "onOpen", "disableBackdropTransition", "disableDiscovery", "swipeAreaWidth"]),
+    drop: new Set(["anchor", "variant", "elevation", "ModalProps", "PaperProps", "hideBackdrop", "transitionDuration", "onOpen", "disableBackdropTransition", "disableDiscovery", "swipeAreaWidth", ...ROOT_STYLE_DROP]),
   });
 
   const edits: ContainerEdit[] = emitWrap(
     context,
     `<Sheet${rootAttributes}>`,
-    `\n${indent}  <SheetContent side="${side}">`,
+    `\n${indent}  <SheetContent side="${side}"${contentStyleAttributes(element)}>`,
     `${indent}  </SheetContent>\n${indent}`,
     "</Sheet>",
   );
@@ -655,10 +673,11 @@ export function menuContainer(context: ContainerContext): ContainerEdit[] {
       "autoFocus",
       "disableAutoFocusItem",
       "marginThreshold",
+      ...ROOT_STYLE_DROP,
     ]),
   });
 
-  const innerOpen = `\n${indent}  <DropdownMenuTrigger>Menu</DropdownMenuTrigger>\n${indent}  <DropdownMenuContent>`;
+  const innerOpen = `\n${indent}  <DropdownMenuTrigger>Menu</DropdownMenuTrigger>\n${indent}  <DropdownMenuContent${contentStyleAttributes(element)}>`;
   const innerClose = `${indent}  </DropdownMenuContent>\n${indent}`;
   const edits = emitWrap(context, `<DropdownMenu${rootAttributes}>`, innerOpen, innerClose, "</DropdownMenu>");
 
@@ -707,11 +726,12 @@ export function popoverContainer(context: ContainerContext): ContainerEdit[] {
       "id",
       "TransitionComponent",
       "transitionDuration",
+      ...ROOT_STYLE_DROP,
     ]),
   });
 
   const { indent } = context;
-  const innerOpen = `\n${indent}  <PopoverTrigger>Open</PopoverTrigger>\n${indent}  <PopoverContent>`;
+  const innerOpen = `\n${indent}  <PopoverTrigger>Open</PopoverTrigger>\n${indent}  <PopoverContent${contentStyleAttributes(element)}>`;
   const innerClose = `${indent}  </PopoverContent>\n${indent}`;
   return emitWrap(context, `<Popover${rootAttributes}>`, innerOpen, innerClose, "</Popover>");
 }

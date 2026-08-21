@@ -92,6 +92,35 @@ test("spread props are preserved on Select (react-hook-form field)", () => {
   assert.match(result.text, /<Select \{\.\.\.field\}>/);
 });
 
+// ---- className/sx moved off Radix roots onto the content element ----
+
+test("Dialog className moves to DialogContent, not the Radix root", () => {
+  const result = migrate(
+    'import { Dialog, DialogTitle } from "@mui/material";\n' +
+      'export const A = ({ open }: any) => (<Dialog open={open} className="max-w-2xl"><DialogTitle>T</DialogTitle></Dialog>);\n',
+  );
+  assert.match(result.text, /<DialogContent className="max-w-2xl">/);
+  assert.doesNotMatch(result.text, /<Dialog [^>]*className/);
+});
+
+test("Drawer sx width converts to a class on SheetContent, not the Sheet root", () => {
+  const result = migrate(
+    'import { Drawer } from "@mui/material";\n' +
+      "export const A = ({ open }: any) => (<Drawer open={open} sx={{ width: 240 }}><nav>N</nav></Drawer>);\n",
+  );
+  assert.match(result.text, /<SheetContent side="left" className="w-\[240px\]">/);
+  assert.doesNotMatch(result.text, /<Sheet [^>]*(className|sx)/);
+});
+
+test("Select sx moves to SelectTrigger, not the Radix root", () => {
+  const result = migrate(
+    'import { Select, MenuItem } from "@mui/material";\n' +
+      'export const A = () => (<Select value="a" sx={{ minWidth: 180 }}><MenuItem value="a">A</MenuItem></Select>);\n',
+  );
+  assert.match(result.text, /<SelectTrigger className="min-w-\[180px\]">/);
+  assert.doesNotMatch(result.text, /<Select [^>]*sx=/);
+});
+
 // ---- unconditional-render gating ----
 
 test("Backdrop is gated on its open expression, not rendered unconditionally", () => {
