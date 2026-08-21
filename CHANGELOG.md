@@ -15,6 +15,8 @@ Fidelity pass (v0.6, in progress): converting common APIs faithfully rather than
 - **Alert severities are colored.** Only `error` mapped to a variant; `success`/`warning`/`info` fell back to the neutral gray box. They now get severity-tinted classes (green/amber/sky, with a `[&>svg]` rule to color an icon child), with a warning to add the lucide icon for the full MUI look.
 - **Chip `onDelete` keeps the remove affordance.** A deletable chip (filter tag, multi-select token) now emits a trailing remove `<button>` wired to the handler with a lucide `X`, instead of silently dropping the delete button and unreferencing the handler.
 - **Dialog sizing is preserved.** `fullWidth`, `maxWidth` (`xs`–`xl` → exact `sm:max-w-[…px]`), `fullScreen`, and `scroll="paper"` were dropped silently (wide dialogs collapsed to the shadcn default width). They now become classes on the emitted `DialogContent` (merged via `cn` when it already has a `className` expression).
+- **The `sx` pass no longer touches non-MUI files.** A file with no MUI/`@material-ui`/`@emotion`/shadcn-ui markers is skipped entirely, so `sx` on a Chakra/Theme-UI/styled-system component is not silently rewritten with MUI's spacing semantics.
+- **`--setup` keeps MUI's breakpoints.** When it sets up Tailwind from scratch, it appends an `@theme` block redefining `sm`/`md`/`lg`/`xl` to MUI's values (600/900/1200/1536), so migrated responsive classes keep their switch points instead of silently shifting (MUI `md`=900 vs Tailwind `md`=768). The block is clearly commented and can be deleted to use Tailwind's defaults.
 
 ## [0.5.0] - 2026-08-21
 

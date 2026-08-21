@@ -122,7 +122,24 @@ test("with no stylesheet, a globals.css is created under the detected app dir", 
     const applied = applyTailwind(plan, dir);
     assert.equal(applied.cssAction, "created");
     const css = readFileSync(join(dir, "src/app/globals.css"), "utf8");
-    assert.equal(css, '@import "tailwindcss";\n');
+    assert.match(css, /^@import "tailwindcss";\n/);
+    // MUI-compatible breakpoints are appended so migrated responsive classes
+    // keep their switch points.
+    assert.match(css, /--breakpoint-md: 900px/);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("applyTailwind adds the MUI breakpoints block once (idempotent)", () => {
+  const dir = project({ "package.json": NEXT_PKG });
+  mkdirSync(join(dir, "src", "app"), { recursive: true });
+  try {
+    const plan = planTailwind(dir);
+    applyTailwind(plan, dir);
+    applyTailwind(planTailwind(dir), dir);
+    const css = readFileSync(join(dir, "src/app/globals.css"), "utf8");
+    assert.equal(css.match(/--breakpoint-md: 900px/g)?.length, 1);
   } finally {
     cleanup(dir);
   }
