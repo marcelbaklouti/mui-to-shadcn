@@ -425,13 +425,31 @@ export function toggleGroupContainer(context: ContainerContext): ContainerEdit[]
 
 export function drawerContainer(context: ContainerContext): ContainerEdit[] {
   const { element, node, indent } = context;
+  const variant = attributeString(element, "variant");
+  const side = attributeString(element, "anchor") ?? "left";
+
+  // Permanent/persistent drawers are app-shell navigation, not modal overlays.
+  // A Sheet is a closed Radix dialog with no trigger, so it would render nothing
+  // at runtime — emit a static <aside> instead.
+  if (variant === "permanent" || variant === "persistent") {
+    context.warn(
+      `Drawer variant="${variant}" -> static <aside> (app-shell navigation); for the AppBar+Drawer layout consider the shadcn sidebar block`,
+    );
+    const borderSide =
+      side === "right" ? "border-l" : side === "top" ? "border-b" : side === "bottom" ? "border-t" : "border-r";
+    const asideClass = `h-full w-60 shrink-0 overflow-y-auto ${borderSide} bg-background`;
+    const openAttribute = variant === "persistent" ? attribute(element, "open") : undefined;
+    const gate = openAttribute && openAttribute.value.kind === "expression" ? openAttribute.value.expression : null;
+    const openTag = gate ? `{${gate} && (<aside className="${asideClass}">` : `<aside className="${asideClass}">`;
+    const closeTag = gate ? `</aside>)}` : "</aside>";
+    return emitWrap(context, openTag, "", "", closeTag);
+  }
+
   context.registerImport({ names: ["Sheet", "SheetContent"], moduleSpecifier: "@/components/ui/sheet" });
   if (attribute(element, "onClose")) {
     context.warn("Drawer onClose -> onOpenChange; the handler now receives a boolean instead of (event, reason)");
   }
   context.warn("Sheet may need a SheetTrigger");
-
-  const side = attributeString(element, "anchor") ?? "left";
   const rootAttributes = renderRootAttributes(element, {
     context,
     rename: new Map([["onClose", "onOpenChange"]]),
@@ -888,13 +906,59 @@ export function snackbarContainer(context: ContainerContext): ContainerEdit[] {
   context.warn(`Snackbar is imperative; use sonner${messageHint} and place <Toaster /> in your layout`);
 
   if (childJsxElements(node).length > 0) {
+    const openAttribute = attribute(element, "open");
+    const gate = openAttribute && openAttribute.value.kind === "expression" ? openAttribute.value.expression : null;
     const open = openingElementRange(node);
     const close = closingElementRange(node);
+    // Gate the preserved child on `open` so the toast content is not rendered
+    // permanently once the Snackbar wrapper is removed.
+    if (gate && close) {
+      return [
+        { start: open.start, end: open.end, replacement: `{${gate} && (` },
+        { start: close.start, end: close.end, replacement: `)}` },
+      ];
+    }
     const edits: ContainerEdit[] = [{ start: open.start, end: open.end, replacement: "" }];
     if (close) edits.push({ start: close.start, end: close.end, replacement: "" });
     return edits;
   }
   return [{ start: node.getStart(), end: node.getEnd(), replacement: "<></>" }];
+}
+
+const BACKDROP_CLASS = "fixed inset-0 z-50 flex items-center justify-center bg-black/50";
+
+export function backdropContainer(context: ContainerContext): ContainerEdit[] {
+  const { element, node } = context;
+  const openAttribute = attribute(element, "open");
+  const gate = openAttribute && openAttribute.value.kind === "expression" ? openAttribute.value.expression : null;
+  if (attribute(element, "sx") || attribute(element, "className")) {
+    context.warn("Backdrop sx/className dropped; merge any custom overlay styling into the emitted div's className");
+  }
+  if (!gate && openAttribute) {
+    context.warn("Backdrop open dropped; control visibility with a condition");
+  }
+  // Preserve pass-through props (onClick for click-to-close, etc.); drop the
+  // MUI-only ones and the styling props we replace with a fixed className.
+  const rootAttributes = renderRootAttributes(element, {
+    context,
+    drop: new Set(["open", "invisible", "sx", "className", "components", "componentsProps", "slots", "slotProps", "transitionDuration", "unmountOnExit"]),
+  });
+
+  const open = openingElementRange(node);
+  const close = closingElementRange(node);
+  if (!close) {
+    const div = `<div className="${BACKDROP_CLASS}"${rootAttributes} />`;
+    return [{ start: node.getStart(), end: node.getEnd(), replacement: gate ? `{${gate} && (${div})}` : div }];
+  }
+  // Gate the overlay on `open` so it is not a permanent, app-blocking layer.
+  const openReplacement = gate
+    ? `{${gate} && (<div className="${BACKDROP_CLASS}"${rootAttributes}>`
+    : `<div className="${BACKDROP_CLASS}"${rootAttributes}>`;
+  const closeReplacement = gate ? `</div>)}` : `</div>`;
+  return [
+    { start: open.start, end: open.end, replacement: openReplacement },
+    { start: close.start, end: close.end, replacement: closeReplacement },
+  ];
 }
 
 export function tabContextContainer(context: ContainerContext): ContainerEdit[] {
@@ -969,9 +1033,22 @@ export function tabContextContainer(context: ContainerContext): ContainerEdit[] 
 
 export function transitionContainer(label: string, animateHint: string): (context: ContainerContext) => ContainerEdit[] {
   return (context) => {
-    context.warn(`${label} dropped; content is preserved. Recreate the animation via tw-animate-css (${animateHint}) and the "in" state with a condition/data-state`);
+    const inAttribute = attribute(context.element, "in");
+    const gate = inAttribute && inAttribute.value.kind === "expression" ? inAttribute.value.expression : null;
     const open = openingElementRange(context.node);
     const close = closingElementRange(context.node);
+
+    // Gate the preserved child on the `in` condition so hidden content does not
+    // become permanently visible after the wrapper is removed.
+    if (gate && close) {
+      context.warn(`${label} dropped; content is now gated on the "in" condition. Recreate the animation via tw-animate-css (${animateHint})`);
+      return [
+        { start: open.start, end: open.end, replacement: `{${gate} && (` },
+        { start: close.start, end: close.end, replacement: `)}` },
+      ];
+    }
+
+    context.warn(`${label} dropped; content is preserved. Recreate the animation via tw-animate-css (${animateHint}) and the "in" state with a condition/data-state`);
     if (!close) {
       return [{ start: context.node.getStart(), end: context.node.getEnd(), replacement: "" }];
     }
