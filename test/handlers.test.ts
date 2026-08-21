@@ -44,3 +44,51 @@ test("an already value-style handler is left unchanged", () => {
   );
   assert.match(result.text, /onCheckedChange=\{\(checked\) => setOn\(checked\)\}/);
 });
+
+test("a named Checkbox handler definition is rewritten (e.target.checked -> e)", () => {
+  const result = migrate(
+    'import { Checkbox } from "@mui/material";\n' +
+      "export const A = ({ setC }: any) => {\n" +
+      "  function handleCheck(event: any) { setC(event.target.checked); }\n" +
+      "  return <Checkbox onChange={handleCheck} />;\n" +
+      "};\n",
+  );
+  assert.match(result.text, /onCheckedChange=\{handleCheck\}/);
+  assert.match(result.text, /setC\(event\);/);
+  assert.doesNotMatch(result.text, /event\.target\.checked/);
+});
+
+test("a useCallback-wrapped handler is rewritten", () => {
+  const result = migrate(
+    'import { Switch } from "@mui/material";\nimport { useCallback } from "react";\n' +
+      "export const A = ({ setC }: any) => {\n" +
+      "  const h = useCallback((e: any) => setC(e.target.checked), []);\n" +
+      "  return <Switch onChange={h} />;\n" +
+      "};\n",
+  );
+  assert.match(result.text, /setC\(e\), \[\]\)/);
+});
+
+test("a named Select handler definition is rewritten (e.target.value -> e)", () => {
+  const result = migrate(
+    'import { Select, MenuItem } from "@mui/material";\n' +
+      "export const A = ({ log }: any) => {\n" +
+      "  const handleSelect = (event: any) => log(event.target.value);\n" +
+      '  return <Select value="a" onChange={handleSelect}><MenuItem value="a">A</MenuItem></Select>;\n' +
+      "};\n",
+  );
+  assert.match(result.text, /onValueChange=\{handleSelect\}/);
+  assert.match(result.text, /log\(event\)/);
+});
+
+test("a handler that also uses the event (preventDefault) is left unrewritten", () => {
+  const result = migrate(
+    'import { Checkbox } from "@mui/material";\n' +
+      "export const A = ({ setC }: any) => {\n" +
+      "  const guarded = (e: any) => { e.preventDefault(); setC(e.target.checked); };\n" +
+      "  return <Checkbox onChange={guarded} />;\n" +
+      "};\n",
+  );
+  // unsafe to auto-fix -> body untouched (the rename warning still flags it)
+  assert.match(result.text, /e\.target\.checked/);
+});
