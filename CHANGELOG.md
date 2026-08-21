@@ -4,6 +4,15 @@ All notable changes to this project are documented here. This project adheres to
 
 ## [Unreleased]
 
+Fidelity pass (v0.6, in progress): converting common APIs faithfully rather than dropping them.
+
+### Fixed
+
+- **`<TextField select>` becomes a real Select.** It was converted to a free-text `<Input>` with every `<MenuItem>` option deleted. It now emits the shadcn Select composition (Label + Select + SelectTrigger/SelectValue + SelectContent), keeping the options (which convert to `SelectItem`) and renaming `onChange` to `onValueChange`. Plain and `multiline` TextFields are unchanged.
+- **`<MenuItem value="">` no longer crashes the Select.** Radix `Select.Item` throws on an empty value (the MUI `displayEmpty` placeholder idiom). It is remapped to a `value="none"` sentinel with a warning to handle the clear-selection case; `onClick` on a MenuItem is dropped with a warning.
+- **FormControlLabel keeps disabled/required/labelPlacement/className.** `disabled`/`required` are forwarded onto the control (a disabled checkbox stays disabled instead of becoming permanently enabled); `labelPlacement` (`start`/`top`/`bottom`) maps to the wrapper flex direction; `className`/`sx` are kept on the wrapper.
+- **FormControl consumes its context props.** `error` (previously dropped silently), `required`, `disabled`, and `component` were emitted as invalid `<div>` attributes; they are now consumed with warnings pointing at the nested inputs that need the state.
+
 ## [0.5.0] - 2026-08-21
 
 Scale-hardening pass toward migrating very large (10k+ component) enterprise codebases as completely and correctly as possible. Focus: stop silently skipping whole classes of files, stop emitting non-compiling output, and stop destroying styling.

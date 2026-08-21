@@ -14,9 +14,18 @@ import {
   closingElementRange,
   descendantJsxElements,
   getTagName,
+  indentOf,
   openingElementRange,
   renameTagEdits,
 } from "./nodes.js";
+
+function reindentBlock(replacement: string, indent: string): string {
+  if (!indent) return replacement;
+  return replacement
+    .split("\n")
+    .map((line, index) => (index === 0 || line.length === 0 ? line : indent + line))
+    .join("\n");
+}
 
 function attribute(element: ParsedElement, name: string): ParsedAttribute | undefined {
   return element.attributes.find((entry) => entry.name === name);
@@ -559,7 +568,66 @@ export function tooltipContainer(context: ContainerContext): ContainerEdit[] {
   return emitWrap(context, "<TooltipProvider>", innerOpen, innerClose, "</TooltipProvider>");
 }
 
-export const textFieldTransform: CompositeTransform = (context) => {
+// A `<TextField select>` is MUI's dropdown-with-label idiom; convert it to the
+// shadcn Select composition (keeping the MenuItem children, which convert to
+// SelectItem) rather than a free-text Input that drops every option.
+function textFieldSelect(context: ContainerContext): ContainerEdit[] {
+  const { element, indent } = context;
+  context.registerImport({
+    names: ["Select", "SelectContent", "SelectItem", "SelectTrigger", "SelectValue"],
+    moduleSpecifier: "@/components/ui/select",
+  });
+
+  const label = attribute(element, "label");
+  const idAttribute = attribute(element, "id");
+  let id = idAttribute && idAttribute.value.kind === "string" ? idAttribute.value.value : undefined;
+  if (!id && label && label.value.kind === "string") id = slug(label.value.value);
+
+  const value = attribute(element, "value");
+  const defaultValue = attribute(element, "defaultValue");
+  const onChange = attribute(element, "onChange");
+  const valueText = value
+    ? ` value=${renderAttributeValue(value.value)}`
+    : defaultValue
+      ? ` defaultValue=${renderAttributeValue(defaultValue.value)}`
+      : "";
+  const onValueChangeText = onChange ? ` onValueChange=${renderAttributeValue(onChange.value)}` : "";
+  if (onChange) {
+    context.warn("TextField select onChange -> onValueChange; the handler now receives the value string instead of an event");
+  }
+  const placeholder = label && label.value.kind === "string" ? ` placeholder="${label.value.value}"` : "";
+
+  context.registerImport({ names: ["Label"], moduleSpecifier: "@/components/ui/label" });
+  const labelLine = label ? `\n${indent}  <Label htmlFor="${id ?? ""}">${valueAsChild(label.value)}</Label>` : "";
+  const idText = id ? ` id="${id}"` : "";
+
+  const openTag =
+    `<div className="grid items-center gap-1.5">` +
+    labelLine +
+    `\n${indent}  <Select${valueText}${onValueChangeText}>` +
+    `\n${indent}    <SelectTrigger${idText}>\n${indent}      <SelectValue${placeholder} />\n${indent}    </SelectTrigger>` +
+    `\n${indent}    <SelectContent>`;
+  const closeTag = `\n${indent}    </SelectContent>\n${indent}  </Select>\n${indent}</div>`;
+  // MenuItem children between the tags convert to SelectItem via the registry.
+  return emitWrap(context, openTag, "", "", closeTag);
+}
+
+export function textFieldContainer(context: ContainerContext): ContainerEdit[] {
+  if (attribute(context.element, "select")) {
+    return textFieldSelect(context);
+  }
+  // Non-select: emit the Input/Textarea composite as a single block edit and
+  // consume descendants (matching the old composite-transform behavior).
+  const replacement = reindentBlock(
+    textFieldTransform({ element: context.element, registerImport: context.registerImport, warn: context.warn }),
+    indentOf(context.fullText, context.node.getStart()),
+  );
+  const edits: ContainerEdit[] = [{ start: context.element.start, end: context.element.end, replacement }];
+  for (const descendant of descendantJsxElements(context.node)) context.consume(descendant);
+  return edits;
+}
+
+const textFieldTransform: CompositeTransform = (context) => {
   const element = context.element;
   const multiline = Boolean(attribute(element, "multiline"));
   const fieldTag = multiline ? "Textarea" : "Input";
@@ -1148,6 +1216,7 @@ function convertFormControlLabelControl(
   controlNode: JsxElementLike,
   id: string | undefined,
   fclValue: ParsedAttribute | undefined,
+  controlExtra = "",
 ): string {
   const canonical = context.localToCanonical.get(getTagName(controlNode));
   const controlElement = parseElement(controlNode, context.fullText);
@@ -1168,7 +1237,7 @@ function convertFormControlLabelControl(
       parts.push(renderAttribute(entry));
     }
     const attrText = parts.length ? " " + parts.join(" ") : "";
-    return `<${canonical}${idAttr}${attrText} />`;
+    return `<${canonical}${idAttr}${attrText}${controlExtra} />`;
   }
 
   if (canonical === "Radio") {
@@ -1176,12 +1245,12 @@ function convertFormControlLabelControl(
     context.markConverted("Radio");
     const valueAttr = controlElement.attributes.find((entry) => entry.name === "value") ?? fclValue;
     const valueText = valueAttr ? ` value=${renderAttributeValue(valueAttr.value)}` : "";
-    return `<RadioGroupItem${valueText}${idAttr} />`;
+    return `<RadioGroupItem${valueText}${idAttr}${controlExtra} />`;
   }
 
   const parts = controlElement.attributes.map((entry) => renderAttribute(entry));
   const attrText = parts.length ? " " + parts.join(" ") : "";
-  return `<${getTagName(controlNode)}${idAttr}${attrText} />`;
+  return `<${getTagName(controlNode)}${idAttr}${attrText}${controlExtra} />`;
 }
 
 export function formControlLabelContainer(context: ContainerContext): ContainerEdit[] {
@@ -1193,10 +1262,19 @@ export function formControlLabelContainer(context: ContainerContext): ContainerE
   const valueStr = valueAttr && valueAttr.value.kind === "string" ? valueAttr.value.value : undefined;
   const id = valueStr ? slug(valueStr) : labelStr ? slug(labelStr) : undefined;
 
+  // Forward FormControlLabel-level disabled/required onto the control (MUI
+  // propagates them via context), so a disabled checkbox stays disabled.
+  const disabledAttr = attribute(element, "disabled");
+  const requiredAttr = attribute(element, "required");
+  const controlExtra = [
+    disabledAttr ? " " + renderAttribute({ name: "disabled", value: disabledAttr.value }) : "",
+    requiredAttr ? " " + renderAttribute({ name: "required", value: requiredAttr.value }) : "",
+  ].join("");
+
   const controlNode = controlElementOf(node);
   let controlJsx = "{/* control */}";
   if (controlNode) {
-    controlJsx = convertFormControlLabelControl(context, controlNode, id, valueAttr);
+    controlJsx = convertFormControlLabelControl(context, controlNode, id, valueAttr, controlExtra);
   } else {
     context.warn("FormControlLabel control is not a static element; rebuild the control manually");
   }
@@ -1204,10 +1282,22 @@ export function formControlLabelContainer(context: ContainerContext): ContainerE
     context.warn("FormControlLabel without a static value/label; link the control and Label via id/htmlFor manually");
   }
 
+  // labelPlacement -> wrapper direction (JSX order is control then Label).
+  const placement = attributeString(element, "labelPlacement");
+  const placementClass =
+    placement === "start" ? " flex-row-reverse" : placement === "top" ? " flex-col-reverse" : placement === "bottom" ? " flex-col" : "";
+  const classNameAttr = attribute(element, "className");
+  const extraClass = classNameAttr && classNameAttr.value.kind === "string" ? " " + classNameAttr.value.value : "";
+  if (classNameAttr && classNameAttr.value.kind !== "string") {
+    context.warn("FormControlLabel className expression dropped; merge it onto the wrapper div manually");
+  }
+  const sxAttr = attribute(element, "sx");
+  const sxText = sxAttr ? ` sx=${renderAttributeValue(sxAttr.value)}` : "";
+
   const labelChild = labelAttr ? valueAsChild(labelAttr.value) : "";
   const htmlFor = id ? ` htmlFor="${id}"` : "";
   const replacement = [
-    `<div className="flex items-center gap-2">`,
+    `<div className="flex items-center gap-2${placementClass}${extraClass}"${sxText}>`,
     `${indent}  ${controlJsx}`,
     `${indent}  <Label${htmlFor}>${labelChild}</Label>`,
     `${indent}</div>`,
