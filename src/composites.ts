@@ -288,6 +288,25 @@ export const buttonTransform: CompositeTransform = (context) => {
   const classes: string[] = [];
   if (findAttribute(context, "fullWidth")) classes.push("w-full");
 
+  // loading (core Button since v6.4, and every @mui/lab LoadingButton): disable
+  // the button and prepend a spinner instead of leaking `loading` to the DOM.
+  const loadingAttribute = findAttribute(context, "loading");
+  let loadingSpinner = "";
+  if (loadingAttribute) {
+    consumed.add("loading");
+    consumed.add("loadingPosition");
+    consumed.add("loadingIndicator");
+    consumed.add("disabled");
+    const asExpr = (value: AttributeValue): string =>
+      value.kind === "expression" ? value.expression : value.kind === "boolean" ? "true" : `"${value.value}"`;
+    const loadingGate = asExpr(loadingAttribute.value);
+    const disabledAttribute = findAttribute(context, "disabled");
+    const combined = disabledAttribute ? `${asExpr(disabledAttribute.value)} || ${loadingGate}` : loadingGate;
+    leading.push(`disabled={${combined}}`);
+    context.registerImport({ names: ["Loader2"], moduleSpecifier: "lucide-react" });
+    loadingSpinner = `{${loadingGate} && <Loader2 className="mr-2 size-4 animate-spin" />}`;
+  }
+
   const hrefAttribute = findAttribute(context, "href");
   const componentAttribute = findAttribute(context, "component");
   // Wrap with the polymorphic component when given (e.g. component={NextLink}), else an
@@ -304,7 +323,7 @@ export const buttonTransform: CompositeTransform = (context) => {
   const startIcon = findAttribute(context, "startIcon");
   const endIcon = findAttribute(context, "endIcon");
   const inner = context.element.hasChildren ? context.element.innerText.trim() : "";
-  let children = [startIcon ? iconChild(startIcon.value) : "", inner, endIcon ? iconChild(endIcon.value) : ""]
+  let children = [loadingSpinner, startIcon ? iconChild(startIcon.value) : "", inner, endIcon ? iconChild(endIcon.value) : ""]
     .filter(Boolean)
     .join(" ");
   if (wrapperTag) {

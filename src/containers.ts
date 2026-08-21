@@ -208,6 +208,22 @@ export function selectContainer(context: ContainerContext): ContainerEdit[] {
   return emitWrap(context, `<Select${rootAttributes}>`, innerOpen, innerClose, "</Select>");
 }
 
+// MUI ButtonGroup -> shadcn ButtonGroup (button-group). Group-level variant/
+// color/size are context props MUI propagates to children; shadcn does not, so
+// they are warned rather than silently applied. Child Buttons convert normally.
+export function buttonGroupContainer(context: ContainerContext): ContainerEdit[] {
+  const { element, indent } = context;
+  context.registerImport({ names: ["ButtonGroup"], moduleSpecifier: "@/components/ui/button-group" });
+  if (attribute(element, "variant") || attribute(element, "color") || attribute(element, "size")) {
+    context.warn(
+      "ButtonGroup variant/color/size are context props; shadcn ButtonGroup does not propagate them — set variant/size on each child Button",
+    );
+  }
+  const orientation = attributeString(element, "orientation");
+  const orientationAttr = orientation === "vertical" ? ` orientation="vertical"` : "";
+  return emitWrap(context, `<ButtonGroup${orientationAttr}>`, "", `\n${indent}`, "</ButtonGroup>");
+}
+
 export function accordionContainer(context: ContainerContext): ContainerEdit[] {
   const { element, node, indent } = context;
   context.registerImport({

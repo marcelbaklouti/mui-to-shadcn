@@ -2,7 +2,7 @@
 
 > Auto-generated from the registry (`src/mappings.ts`). Regenerate with `npm run docs`.
 
-Catalogued: 115 MUI components. Full: 99, in parent: 7, partial: 4, manual: 5.
+Catalogued: 118 MUI components. Full: 102, in parent: 7, partial: 4, manual: 5.
 
 Plus `@mui/icons-material` → `lucide-react` (~700 icon names mapped) and MUI theme/Emotion infrastructure removal (`ThemeProvider`, `CssBaseline`, cache providers).
 
@@ -17,6 +17,7 @@ Legend: **Full** = structurally fully converted. **In parent** = converted autom
 | AlertTitle | AlertTitle | - |
 | AppBar | header | - |
 | Avatar | Avatar + AvatarImage/AvatarFallback | - |
+| AvatarGroup | div | - |
 | Backdrop | - | - |
 | Badge | span + Badge (positioned) | positioned overlay over the child |
 | BottomNavigation | nav | - |
@@ -24,6 +25,7 @@ Legend: **Full** = structurally fully converted. **In parent** = converted autom
 | Breadcrumbs | Breadcrumb + List/Item/Link/Page | - |
 | Button | - | - |
 | ButtonBase | button | native button (unstyled); add styling or use Button |
+| ButtonGroup | - | - |
 | Card | Card | - |
 | CardActionArea | button | - |
 | CardActions | CardFooter | - |
@@ -69,6 +71,7 @@ Legend: **Full** = structurally fully converted. **In parent** = converted autom
 | ListItemSecondaryAction | span | - |
 | ListItemText | div + span | - |
 | ListSubheader | li | - |
+| LoadingButton | - | - |
 | Menu | DropdownMenu + Trigger/Content/Item | anchorEl dropped; replace the trigger element |
 | MenuItem | SelectItem | - |
 | MenuList | DropdownMenu + Trigger/Content/Item | anchorEl dropped; replace the trigger element |

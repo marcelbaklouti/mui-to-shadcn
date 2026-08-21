@@ -14,6 +14,7 @@ import {
   backdropContainer,
   badgeContainer,
   breadcrumbsContainer,
+  buttonGroupContainer,
   circularProgressTransform,
   collapseContainer,
   dialogContainer,
@@ -139,6 +140,22 @@ export function buildRegistry(): Registry {
   const registry: Registry = {};
 
   registry.Button = { transform: buttonTransform };
+  // @mui/lab LoadingButton and MUI ButtonGroup.
+  registry.LoadingButton = { transform: buttonTransform };
+  registry.ButtonGroup = { containerTransform: buttonGroupContainer };
+  registry.AvatarGroup = {
+    target: "div",
+    defaultClassName: "flex -space-x-2",
+    props: {
+      max: { drop: true, warning: "AvatarGroup max dropped; render the +N surplus badge manually" },
+      total: { drop: true },
+      spacing: { drop: true },
+      variant: { drop: true },
+      renderSurplus: { drop: true, warning: "AvatarGroup renderSurplus dropped; rebuild the surplus badge manually" },
+      componentsProps: { drop: true },
+      slotProps: { drop: true },
+    },
+  };
 
   registry.IconButton = {
     target: "Button",
