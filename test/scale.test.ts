@@ -121,6 +121,23 @@ test("Select sx moves to SelectTrigger, not the Radix root", () => {
   assert.doesNotMatch(result.text, /<Select [^>]*sx=/);
 });
 
+// ---- anchorEl menus become uncontrolled with a visible TODO trigger ----
+
+test("Menu with anchorEl emits an uncontrolled DropdownMenu (no self-closing dead trigger)", () => {
+  const result = migrate(
+    'import { Menu, MenuItem } from "@mui/material";\n' +
+      "export const A = ({ anchorEl, close }: any) => (\n" +
+      "  <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={close}>\n" +
+      "    <MenuItem onClick={close}>Profile</MenuItem>\n" +
+      "  </Menu>\n);\n",
+  );
+  assert.match(result.text, /<DropdownMenu>/);
+  // Not controlled — a controlled root would make the trigger close the menu.
+  assert.doesNotMatch(result.text, /onOpenChange/);
+  assert.match(result.text, /<DropdownMenuTrigger>\{\/\* TODO/);
+  assert.match(result.text, /<DropdownMenuItem onClick=\{close\}>Profile<\/DropdownMenuItem>/);
+});
+
 // ---- unconditional-render gating ----
 
 test("Backdrop is gated on its open expression, not rendered unconditionally", () => {
