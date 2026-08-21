@@ -2,6 +2,7 @@ import { Node, SyntaxKind } from "ts-morph";
 import type { SourceFile } from "ts-morph";
 import type {
   AttributeValue,
+  BarrelMap,
   CompositeContext,
   ComponentMapping,
   ContainerContext,
@@ -160,6 +161,7 @@ function emitInPlace(
 
 export interface PlanOptions {
   base?: "radix" | "base";
+  barrelMap?: BarrelMap;
 }
 
 export function planFile(
@@ -169,7 +171,7 @@ export function planFile(
   options: PlanOptions = {},
 ): PlanResult {
   const base = options.base ?? "radix";
-  const bindings = collectMuiBindings(sourceFile);
+  const bindings = collectMuiBindings(sourceFile, options.barrelMap);
   const localToCanonical = new Map<string, string>();
   for (const binding of bindings) localToCanonical.set(binding.localName, binding.canonicalName);
 

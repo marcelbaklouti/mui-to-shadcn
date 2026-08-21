@@ -1,6 +1,7 @@
+import { dirname, join, resolve } from "node:path";
 import type { ImportDeclaration, SourceFile } from "ts-morph";
 import type { Edit } from "./edits.js";
-import type { ImportRequest } from "./types.js";
+import type { BarrelMap, ImportRequest } from "./types.js";
 
 const MUI_BARRELS = [
   "@mui/material",
@@ -27,12 +28,81 @@ export interface MuiBinding {
   canonicalName: string;
 }
 
-export function collectMuiBindings(sourceFile: SourceFile): MuiBinding[] {
+// For a barrel file, map each name it re-exports from an @mui/@material-ui
+// barrel to the canonical MUI component name. Handles named, aliased, deep, and
+// blanket (`export *`) re-exports.
+export function collectMuiReexports(sourceFile: SourceFile): Map<string, string> {
+  const exports = new Map<string, string>();
+  for (const declaration of sourceFile.getExportDeclarations()) {
+    const moduleSpecifier = declaration.getModuleSpecifierValue();
+    if (!moduleSpecifier) continue;
+    const matched = matchBarrel(moduleSpecifier);
+    if (!matched) continue;
+    const named = declaration.getNamedExports();
+    if (named.length === 0 && !declaration.getNamespaceExport()) {
+      // export * from "@mui/material" — the barrel re-exports every MUI name.
+      exports.set("*", "*");
+      continue;
+    }
+    const deepCanonical = matched.deep ? (moduleSpecifier.slice(matched.barrel.length + 1).split("/")[0] ?? "") : "";
+    for (const entry of named) {
+      const name = entry.getNameNode().getText();
+      const exportedName = entry.getAliasNode()?.getText() ?? name;
+      const canonical = matched.deep && name === "default" ? deepCanonical : name;
+      if (exportedName && canonical) exports.set(exportedName, canonical);
+    }
+  }
+  return exports;
+}
+
+// Resolve a relative import specifier from `fromFilePath` to a barrel file path
+// present in `barrelMap` (trying the usual extensions and index files).
+function resolveBarrelPath(fromFilePath: string, specifier: string, barrelMap: BarrelMap): string | undefined {
+  if (!specifier.startsWith(".")) return undefined;
+  const base = resolve(dirname(fromFilePath), specifier);
+  const candidates = [
+    base,
+    `${base}.ts`,
+    `${base}.tsx`,
+    `${base}.js`,
+    `${base}.jsx`,
+    join(base, "index.ts"),
+    join(base, "index.tsx"),
+    join(base, "index.js"),
+    join(base, "index.jsx"),
+  ];
+  for (const candidate of candidates) {
+    if (barrelMap.has(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+function canonicalFromBarrel(exports: Map<string, string>, importedName: string): string | undefined {
+  const direct = exports.get(importedName);
+  if (direct) return direct;
+  return exports.has("*") ? importedName : undefined;
+}
+
+export function collectMuiBindings(sourceFile: SourceFile, barrelMap?: BarrelMap): MuiBinding[] {
   const bindings: MuiBinding[] = [];
+  const fromPath = barrelMap && barrelMap.size ? sourceFile.getFilePath() : "";
   for (const declaration of sourceFile.getImportDeclarations()) {
     const moduleSpecifier = declaration.getModuleSpecifierValue();
     const matched = matchBarrel(moduleSpecifier);
-    if (!matched) continue;
+    if (!matched) {
+      // Resolve imports that come through a local re-export barrel.
+      if (!barrelMap || !barrelMap.size) continue;
+      const barrelPath = resolveBarrelPath(fromPath, moduleSpecifier, barrelMap);
+      if (!barrelPath) continue;
+      const exports = barrelMap.get(barrelPath)!;
+      for (const named of declaration.getNamedImports()) {
+        const canonicalName = canonicalFromBarrel(exports, named.getNameNode().getText());
+        if (!canonicalName) continue;
+        const alias = named.getAliasNode();
+        bindings.push({ localName: alias ? alias.getText() : named.getNameNode().getText(), canonicalName });
+      }
+      continue;
+    }
     if (!matched.deep) {
       for (const named of declaration.getNamedImports()) {
         const canonicalName = named.getNameNode().getText();
@@ -89,16 +159,59 @@ function rewriteBarrelDeclaration(
   return { start: declaration.getStart(), end: declaration.getEnd(), replacement };
 }
 
+// Trim the converted names from a local re-export-barrel import declaration,
+// mapping each imported name to its canonical via the barrel's export map.
+function rewriteLocalBarrelDeclaration(
+  declaration: ImportDeclaration,
+  converted: Set<string>,
+  fullText: string,
+  exports: Map<string, string>,
+): Edit | null {
+  const namedImports = declaration.getNamedImports();
+  if (!namedImports.length) return null;
+  const kept = namedImports.filter((named) => {
+    const canonical = canonicalFromBarrel(exports, named.getNameNode().getText());
+    return !(canonical && converted.has(canonical));
+  });
+  if (kept.length === namedImports.length) return null;
+
+  const defaultImport = declaration.getDefaultImport();
+  const namespaceImport = declaration.getNamespaceImport();
+  if (kept.length === 0 && !defaultImport && !namespaceImport) {
+    const start = declaration.getStart();
+    const end = declaration.getEnd() + trailingNewlineLength(fullText, declaration.getEnd());
+    return { start, end, replacement: "" };
+  }
+  const typeOnly = declaration.isTypeOnly() ? "type " : "";
+  const defaultText = defaultImport ? defaultImport.getText() : "";
+  const namedText = kept.map((named) => named.getText()).join(", ");
+  const prefix = defaultText ? `${defaultText}, ` : "";
+  return {
+    start: declaration.getStart(),
+    end: declaration.getEnd(),
+    replacement: `import ${typeOnly}${prefix}{ ${namedText} } from "${declaration.getModuleSpecifierValue()}";`,
+  };
+}
+
 export function buildImportEdits(
   sourceFile: SourceFile,
   converted: Set<string>,
   fullText: string,
+  barrelMap?: BarrelMap,
 ): Edit[] {
   const edits: Edit[] = [];
+  const fromPath = barrelMap && barrelMap.size ? sourceFile.getFilePath() : "";
   for (const declaration of sourceFile.getImportDeclarations()) {
     const moduleSpecifier = declaration.getModuleSpecifierValue();
     const matched = matchBarrel(moduleSpecifier);
-    if (!matched) continue;
+    if (!matched) {
+      if (!barrelMap || !barrelMap.size) continue;
+      const barrelPath = resolveBarrelPath(fromPath, moduleSpecifier, barrelMap);
+      if (!barrelPath) continue;
+      const edit = rewriteLocalBarrelDeclaration(declaration, converted, fullText, barrelMap.get(barrelPath)!);
+      if (edit) edits.push(edit);
+      continue;
+    }
     if (!matched.deep) {
       const edit = rewriteBarrelDeclaration(declaration, converted, fullText, matched.barrel);
       if (edit) edits.push(edit);

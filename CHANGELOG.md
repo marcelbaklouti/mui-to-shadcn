@@ -4,6 +4,8 @@ All notable changes to this project are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-21
+
 Scale-hardening pass toward migrating very large (10k+ component) enterprise codebases as completely and correctly as possible. Focus: stop silently skipping whole classes of files, stop emitting non-compiling output, and stop destroying styling.
 
 ### Added
@@ -13,6 +15,8 @@ Scale-hardening pass toward migrating very large (10k+ component) enterprise cod
 - **`@mui/system` support.** `Box`/`Stack`/`Container`/`Grid` imported from `@mui/system` (a common bundle-conscious pattern) now convert like their `@mui/material` equivalents, and the import is removed. Non-component exports (`styled`, `useTheme`, …) are left in place.
 - **End-of-run "still references MUI" safety net.** Every file whose output still imports `@mui/*`, `@material-ui/*`, or `@emotion/*` now emits a warning and is counted in a new `Files still referencing MUI: N` CLI summary line (and exposed as `residualMui` on the programmatic result). This surfaces every silent-skip class (namespace imports, internal re-export barrels, unmapped components, dangling type imports) that previously left no trace in the report or `MIGRATION.md`.
 - **Per-file error isolation.** An unexpected failure while transforming one file no longer aborts the entire run (previously fatal on a large codebase, and with `--write` it left a half-migrated tree). The file is reported (`error: <file>: … (skipped)`), counted in a `Files skipped due to errors: N` summary line, and the run continues.
+- **Cross-file re-export-barrel resolution.** Enterprise design systems funnel MUI through an internal barrel (`ui/index.ts` doing `export { Button } from "@mui/material"`, consumers importing from `../ui`). A streaming pre-pass now builds the barrel map across all inputs, so consumer files that import MUI through such a barrel are fully converted (their JSX and their local-barrel imports), where before they were silently skipped entirely. Named, aliased (`Button as Btn`), deep (`export { default as Dialog } from "@mui/material/Dialog"`), and blanket (`export *`) re-exports are resolved; the barrel file itself is flagged by the residual-MUI safety net.
+- **Batched processing.** The CLI enumerates file paths without parsing, then processes them in batches with a fresh ts-morph `Project` per batch, so peak memory is bounded by the batch size instead of the whole codebase (previously every file's AST was held at once — ~7–8 GB projected for 10k files).
 
 ### Fixed
 

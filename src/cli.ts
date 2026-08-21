@@ -4,8 +4,10 @@ import { writeFileSync } from "node:fs";
 import { relative, join } from "node:path";
 import { createRequire } from "node:module";
 import { Project, ts } from "ts-morph";
+import type { SourceFile } from "ts-morph";
 import { runMigration } from "./run.js";
-import { collectSourceFiles } from "./paths.js";
+import { listSourceFilePaths } from "./paths.js";
+import { buildBarrelMap } from "./barrel-map.js";
 import { runSetup } from "./setup.js";
 import type { PackageManager } from "./setup.js";
 import { buildMigrationDoc } from "./migration-doc.js";
@@ -91,19 +93,15 @@ async function main(): Promise<void> {
     process.exit(status);
   }
 
-  const project = new Project({
-    skipAddingFilesFromTsConfig: true,
-    useInMemoryFileSystem: false,
-    // allowJs + jsx so .js/.jsx sources (CRA and v4-era codebases) are parsed
-    // with JSX support, not just .ts/.tsx.
-    compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve },
-  });
-
-  const files = collectSourceFiles(project, positionals);
-  if (files.length === 0) {
+  const paths = listSourceFilePaths(positionals);
+  if (paths.length === 0) {
     console.error("No matching files found");
     process.exit(1);
   }
+
+  // Resolve MUI re-export barrels across the whole input up front, so files that
+  // import MUI through a local barrel (design-system wrappers) convert too.
+  const barrelMap = buildBarrelMap(paths);
 
   const write = values.write === true;
   const report = values.report === true;
@@ -117,49 +115,71 @@ async function main(): Promise<void> {
   const components = new Set<string>();
   const reports: FileReport[] = [];
 
-  for (const file of files) {
-    const rel = relative(process.cwd(), file.getFilePath());
-    // Isolate each file: an unexpected transform failure on one file must not
-    // abort the whole run (critical on large codebases). Skip it and continue.
-    let result;
-    try {
-      result = runMigration(file, { sx: applySx, base });
-    } catch (error) {
-      failedCount += 1;
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`error: ${rel}: ${message} (skipped)`);
-      continue;
-    }
-    warningCount += result.warnings.length;
-    if (result.residualMui.length) residualMuiCount += 1;
-    for (const slug of result.components) components.add(slug);
-    for (const hit of result.manual) {
-      manualTotals.set(hit.component, (manualTotals.get(hit.component) ?? 0) + 1);
-    }
-    if (result.manual.length || result.warnings.length) {
-      reports.push({ file: rel, manual: result.manual, warnings: result.warnings });
-    }
-
-    if (result.changed) {
-      changedCount += 1;
-      if (write) {
-        writeFileSync(file.getFilePath(), result.text);
-        console.log(`changed: ${rel}`);
-      } else {
-        console.log(`would change: ${rel}`);
+  // Process in batches with a fresh Project each, so a huge codebase does not
+  // hold every AST in memory at once.
+  const BATCH_SIZE = 200;
+  for (let offset = 0; offset < paths.length; offset += BATCH_SIZE) {
+    const batchPaths = paths.slice(offset, offset + BATCH_SIZE);
+    const project = new Project({
+      skipAddingFilesFromTsConfig: true,
+      useInMemoryFileSystem: false,
+      // allowJs + jsx so .js/.jsx sources (CRA and v4-era codebases) are parsed
+      // with JSX support, not just .ts/.tsx.
+      compilerOptions: { allowJs: true, jsx: ts.JsxEmit.Preserve },
+    });
+    const files: SourceFile[] = [];
+    for (const path of batchPaths) {
+      try {
+        files.push(project.addSourceFileAtPath(path));
+      } catch {
+        // Unreadable/removed since enumeration; surfaced as a missing file below.
       }
     }
 
-    if (report) {
-      for (const warning of result.warnings) console.log(`  warning: ${warning}`);
+    for (const file of files) {
+      const rel = relative(process.cwd(), file.getFilePath());
+      // Isolate each file: an unexpected transform failure on one file must not
+      // abort the whole run (critical on large codebases). Skip it and continue.
+      let result;
+      try {
+        result = runMigration(file, { sx: applySx, base, barrelMap });
+      } catch (error) {
+        failedCount += 1;
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`error: ${rel}: ${message} (skipped)`);
+        continue;
+      }
+      warningCount += result.warnings.length;
+      if (result.residualMui.length) residualMuiCount += 1;
+      for (const slug of result.components) components.add(slug);
       for (const hit of result.manual) {
-        console.log(`  manual: line ${hit.line} <${hit.component}> ${hit.message}`);
+        manualTotals.set(hit.component, (manualTotals.get(hit.component) ?? 0) + 1);
+      }
+      if (result.manual.length || result.warnings.length) {
+        reports.push({ file: rel, manual: result.manual, warnings: result.warnings });
+      }
+
+      if (result.changed) {
+        changedCount += 1;
+        if (write) {
+          writeFileSync(file.getFilePath(), result.text);
+          console.log(`changed: ${rel}`);
+        } else {
+          console.log(`would change: ${rel}`);
+        }
+      }
+
+      if (report) {
+        for (const warning of result.warnings) console.log(`  warning: ${warning}`);
+        for (const hit of result.manual) {
+          console.log(`  manual: line ${hit.line} <${hit.component}> ${hit.message}`);
+        }
       }
     }
   }
 
   console.log("");
-  console.log(`Files checked: ${files.length}`);
+  console.log(`Files checked: ${paths.length}`);
   if (write) {
     console.log(`Files changed: ${changedCount}`);
   } else {

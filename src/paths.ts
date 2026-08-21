@@ -1,3 +1,5 @@
+import { readdirSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import type { Project, SourceFile } from "ts-morph";
 
 export interface PartitionedInputs {
@@ -23,6 +25,35 @@ export function partitionInputs(inputs: string[]): PartitionedInputs {
   }
   if (globs.length) globs.push("!**/node_modules/**");
   return { files, globs };
+}
+
+function walkDirectory(dir: string, out: string[]): void {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) walkDirectory(full, out);
+    else if (SOURCE_EXTENSION_RE.test(entry.name)) out.push(full);
+  }
+}
+
+// Enumerate source file paths from the inputs WITHOUT parsing them (so the main
+// pass can load them in batches instead of holding every AST in memory). Returns
+// absolute paths, node_modules excluded.
+export function listSourceFilePaths(inputs: string[]): string[] {
+  const out: string[] = [];
+  for (const input of inputs) {
+    const stat = statSync(input, { throwIfNoEntry: false });
+    if (!stat) continue;
+    if (stat.isDirectory()) walkDirectory(input, out);
+    else if (SOURCE_EXTENSION_RE.test(input)) out.push(input);
+  }
+  return [...new Set(out.map((p) => resolve(p)))];
 }
 
 export function collectSourceFiles(project: Project, inputs: string[]): SourceFile[] {
