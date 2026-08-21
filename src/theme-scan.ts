@@ -1,6 +1,14 @@
 import { Node, SyntaxKind } from "ts-morph";
 import type { ObjectLiteralExpression, SourceFile } from "ts-morph";
 
+export interface ThemeComponentOverride {
+  /** e.g. "MuiButton". */
+  component: string;
+  defaultProps: string[];
+  hasStyleOverrides: boolean;
+  hasVariants: boolean;
+}
+
 export interface ThemeTokens {
   /** shadcn CSS variable name (without `--`) -> value (hex/rgb/keyword). */
   colors: Record<string, string>;
@@ -10,6 +18,8 @@ export interface ThemeTokens {
   /** Custom spacing factor (MUI default is 8). */
   spacing?: number;
   fontFamily?: string;
+  /** theme.components global overrides (defaultProps/styleOverrides/variants). */
+  components: ThemeComponentOverride[];
   /** Palette paths that exist but couldn't be statically evaluated. */
   unresolved: string[];
 }
@@ -64,7 +74,7 @@ export function scanThemeTokens(sourceFile: SourceFile): ThemeTokens | null {
   const root = findThemeArgument(sourceFile);
   if (!root) return null;
 
-  const tokens: ThemeTokens = { colors: {}, unresolved: [] };
+  const tokens: ThemeTokens = { colors: {}, components: [], unresolved: [] };
   for (const { path, cssVar } of COLOR_MAP) {
     const result = literalAtPath(root, path);
     if (result.value) tokens.colors[cssVar] = result.value;
@@ -89,7 +99,43 @@ export function scanThemeTokens(sourceFile: SourceFile): ThemeTokens | null {
   const font = literalAtPath(root, ["typography", "fontFamily"]);
   if (font.value) tokens.fontFamily = font.value;
 
-  if (Object.keys(tokens.colors).length === 0 && !tokens.radius) return null;
+  const componentsProperty = root.getProperty("components");
+  if (componentsProperty && Node.isPropertyAssignment(componentsProperty)) {
+    const componentsObject = componentsProperty.getInitializer();
+    if (componentsObject && Node.isObjectLiteralExpression(componentsObject)) {
+      for (const entry of componentsObject.getProperties()) {
+        if (!Node.isPropertyAssignment(entry)) continue;
+        const overrideObject = entry.getInitializer();
+        if (!overrideObject || !Node.isObjectLiteralExpression(overrideObject)) continue;
+        const defaultProps: string[] = [];
+        const defaultPropsProperty = overrideObject.getProperty("defaultProps");
+        if (defaultPropsProperty && Node.isPropertyAssignment(defaultPropsProperty)) {
+          const defaultPropsObject = defaultPropsProperty.getInitializer();
+          if (defaultPropsObject && Node.isObjectLiteralExpression(defaultPropsObject)) {
+            for (const property of defaultPropsObject.getProperties()) {
+              if (Node.isPropertyAssignment(property) || Node.isShorthandPropertyAssignment(property)) {
+                defaultProps.push(property.getName());
+              }
+            }
+          }
+        }
+        const hasStyleOverrides = Boolean(overrideObject.getProperty("styleOverrides"));
+        const hasVariants = Boolean(overrideObject.getProperty("variants"));
+        if (defaultProps.length || hasStyleOverrides || hasVariants) {
+          tokens.components.push({
+            component: entry.getName().replace(/^["']|["']$/g, ""),
+            defaultProps,
+            hasStyleOverrides,
+            hasVariants,
+          });
+        }
+      }
+    }
+  }
+
+  const hasContent =
+    Object.keys(tokens.colors).length > 0 || tokens.radius !== undefined || tokens.components.length > 0;
+  if (!hasContent) return null;
   return tokens;
 }
 

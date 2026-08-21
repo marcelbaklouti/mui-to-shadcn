@@ -26,6 +26,7 @@ const WARN_UTILS = new Set([
   "extendTheme",
   "useTheme",
   "useColorScheme",
+  "useMediaQuery",
   "alpha",
   "darken",
   "lighten",

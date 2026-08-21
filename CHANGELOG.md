@@ -10,6 +10,8 @@ Theming pass (v0.7, in progress): carry the brand across so the migration looks 
 
 - **Brand tokens from `createTheme()`.** `--setup` now scans a `createTheme`/`extendTheme` palette and, after `shadcn init` writes its defaults, appends a `:root` override with the mapped shadcn CSS variables — `palette.primary.main` → `--primary`, `secondary.main` → `--secondary`, `error.main` → `--destructive`, `background.default`/`paper` → `--background`/`--card`, `text.primary`/`secondary` → `--foreground`/`--muted-foreground`, `divider` → `--border`, and `shape.borderRadius` → `--radius`. Values that can't be statically evaluated are skipped (not crashed on). Exposed as `scanThemeTokens`/`buildThemeCss` for programmatic use.
 - **Dark-mode and custom-spacing signals.** A `palette.mode: "dark"` theme prints a note to add `class="dark"` to `<html>`; a custom `theme.spacing` (≠ 8) prints a warning that converted spacing classes assume the 8px default.
+- **`theme.components` overrides are surfaced.** Global `defaultProps`/`styleOverrides`/`variants` (e.g. `MuiTextField.defaultProps.size = "small"`, which silently changed *every* instance) are now detected and reported per component, so they aren't lost without a trace.
+- **`useMediaQuery` is flagged.** It previously survived silently, keeping `@mui/material` imported; it now appears in the styling-utilities warning so the file is surfaced for manual work.
 
 ## [0.6.0] - 2026-08-21
 
