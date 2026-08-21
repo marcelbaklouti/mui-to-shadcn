@@ -402,7 +402,8 @@ test("Snackbar with a child is unwrapped", () => {
   const result = migrate(
     'import { Snackbar, Alert } from "@mui/material";\nexport const A = () => (\n  <Snackbar open={open} onClose={close}>\n    <Alert severity="success">Gespeichert</Alert>\n  </Snackbar>\n);\n',
   );
-  assert.match(result.text, /<Alert>/);
+  assert.match(result.text, /<Alert\b/);
+  assert.match(result.text, /Gespeichert<\/Alert>/);
   assert.doesNotMatch(result.text, /Snackbar/);
   assert.ok(result.warnings.some((warning) => warning.toLowerCase().includes("toast")));
 });
