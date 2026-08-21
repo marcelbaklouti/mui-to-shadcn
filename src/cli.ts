@@ -112,13 +112,24 @@ async function main(): Promise<void> {
   let changedCount = 0;
   let warningCount = 0;
   let residualMuiCount = 0;
+  let failedCount = 0;
   const manualTotals = new Map<string, number>();
   const components = new Set<string>();
   const reports: FileReport[] = [];
 
   for (const file of files) {
-    const result = runMigration(file, { sx: applySx, base });
     const rel = relative(process.cwd(), file.getFilePath());
+    // Isolate each file: an unexpected transform failure on one file must not
+    // abort the whole run (critical on large codebases). Skip it and continue.
+    let result;
+    try {
+      result = runMigration(file, { sx: applySx, base });
+    } catch (error) {
+      failedCount += 1;
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`error: ${rel}: ${message} (skipped)`);
+      continue;
+    }
     warningCount += result.warnings.length;
     if (result.residualMui.length) residualMuiCount += 1;
     for (const slug of result.components) components.add(slug);
@@ -155,6 +166,9 @@ async function main(): Promise<void> {
     console.log(`Files with changes: ${changedCount} (dry run, nothing written)`);
   }
   console.log(`Warnings: ${warningCount}`);
+  if (failedCount > 0) {
+    console.log(`Files skipped due to errors: ${failedCount}`);
+  }
   if (residualMuiCount > 0) {
     console.log(
       `Files still referencing MUI: ${residualMuiCount} (not fully migrated — see the warnings/MIGRATION.md)`,
