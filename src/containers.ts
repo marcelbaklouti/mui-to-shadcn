@@ -756,18 +756,33 @@ const textFieldTransform: CompositeTransform = (context) => {
     "margin",
     "fullWidth",
     "InputProps",
+    "inputProps",
+    "inputRef",
     "InputLabelProps",
     "FormHelperTextProps",
     "SelectProps",
+    "slotProps", // v6/v9 replacement for InputProps/inputProps
+    "slots",
     "select",
     "error",
     "id",
     "rows",
     "minRows",
     "maxRows",
+    "size",
     "focused",
     "color",
   ]);
+  // Adornments / input attributes live in InputProps (v5) or slotProps (v6/v9);
+  // we can't safely relocate them, so flag rather than leak them onto <Input>.
+  if (attribute(element, "InputProps") || attribute(element, "slotProps")) {
+    context.warn(
+      "TextField InputProps/slotProps dropped; move start/end adornments into an input-group and htmlInput attributes (maxLength, etc.) onto the Input manually",
+    );
+  }
+  if (attribute(element, "inputRef")) {
+    context.warn("TextField inputRef dropped; pass ref directly to the Input");
+  }
 
   const fieldParts: string[] = [];
   if (id) fieldParts.push(`id="${id}"`);
