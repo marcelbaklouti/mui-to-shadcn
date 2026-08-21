@@ -12,6 +12,7 @@ Scale-hardening pass toward migrating very large (10k+ component) enterprise cod
 - **v4 support (`@material-ui/*`).** `@material-ui/core`, `@material-ui/lab`, and `@material-ui/icons` are now recognized (component/icon names are identical to v5), so v4 codebases actually convert instead of reporting "0 changes". v4 theming infra is handled too: `MuiThemeProvider` is unwrapped and `createMuiTheme` is flagged.
 - **`@mui/system` support.** `Box`/`Stack`/`Container`/`Grid` imported from `@mui/system` (a common bundle-conscious pattern) now convert like their `@mui/material` equivalents, and the import is removed. Non-component exports (`styled`, `useTheme`, …) are left in place.
 - **End-of-run "still references MUI" safety net.** Every file whose output still imports `@mui/*`, `@material-ui/*`, or `@emotion/*` now emits a warning and is counted in a new `Files still referencing MUI: N` CLI summary line (and exposed as `residualMui` on the programmatic result). This surfaces every silent-skip class (namespace imports, internal re-export barrels, unmapped components, dangling type imports) that previously left no trace in the report or `MIGRATION.md`.
+- **Per-file error isolation.** An unexpected failure while transforming one file no longer aborts the entire run (previously fatal on a large codebase, and with `--write` it left a half-migrated tree). The file is reported (`error: <file>: … (skipped)`), counted in a `Files skipped due to errors: N` summary line, and the run continues.
 
 ### Fixed
 
