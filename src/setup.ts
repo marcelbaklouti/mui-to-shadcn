@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { createRequire } from "node:module";
 import { Project } from "ts-morph";
@@ -7,6 +7,7 @@ import { runMigration } from "./run.js";
 import { collectSourceFiles } from "./paths.js";
 import { applyTailwind, planTailwind } from "./tailwind.js";
 import type { TailwindPlan } from "./tailwind.js";
+import { buildThemeCss, scanThemeTokens } from "./theme-scan.js";
 import { buildMigrationDoc } from "./migration-doc.js";
 import type { FileReport } from "./migration-doc.js";
 
@@ -51,6 +52,10 @@ export interface SetupPlan {
   /** Manual-task and review-note totals across all files. */
   mdTasks: number;
   mdReviews: number;
+  /** :root override CSS built from a createTheme() palette, if one was found. */
+  themeCss: string | null;
+  /** Path (relative to cwd) of the CSS file to append themeCss to. */
+  themeCssPath: string | null;
 }
 
 export type SetupPlanResult = { ok: true; plan: SetupPlan } | { ok: false; error: string };
@@ -187,6 +192,33 @@ export function planSetup(options: SetupOptions): SetupPlanResult {
     steps.push(`write MIGRATION.md (${mdTasks} task${mdTasks === 1 ? "" : "s"} + ${mdReviews} review note${mdReviews === 1 ? "" : "s"} for an LLM)`);
   }
 
+  // Extract brand tokens from a createTheme() palette and emit them as a :root
+  // override, appended to the global CSS after shadcn init writes its defaults.
+  let themeCss: string | null = null;
+  let themeCssPath: string | null = null;
+  if (tailwind.css) {
+    for (const file of files) {
+      const tokens = scanThemeTokens(file);
+      if (!tokens) continue;
+      const css = buildThemeCss(tokens);
+      if (css) {
+        themeCss = css;
+        themeCssPath = tailwind.css.path;
+        const count = Object.keys(tokens.colors).length + (tokens.radius ? 1 : 0);
+        steps.push(`append ${count} brand token(s) from createTheme() to ${tailwind.css.path}`);
+        if (tokens.mode === "dark") {
+          steps.push('theme palette.mode is "dark" — add class="dark" to <html> for shadcn dark mode');
+        }
+        if (tokens.spacing && tokens.spacing !== 8) {
+          steps.push(
+            `WARNING: createTheme spacing=${tokens.spacing} (not MUI's default 8) — converted spacing classes assume 8px and will be off by a factor; review them`,
+          );
+        }
+      }
+      break;
+    }
+  }
+
   return {
     ok: true,
     plan: {
@@ -209,6 +241,8 @@ export function planSetup(options: SetupOptions): SetupPlanResult {
       writeMd,
       mdTasks,
       mdReviews,
+      themeCss,
+      themeCssPath,
     },
   };
 }
@@ -245,6 +279,15 @@ export function executeSetup(plan: SetupPlan, cwd: string, base: "radix" | "base
     if (status !== 0) {
       console.error("shadcn add failed; aborting.");
       return status;
+    }
+  }
+
+  // Append brand tokens after shadcn wrote its defaults, so they win the cascade.
+  if (plan.themeCss && plan.themeCssPath) {
+    const target = join(cwd, plan.themeCssPath);
+    if (existsSync(target)) {
+      appendFileSync(target, plan.themeCss);
+      console.log(`> brand tokens appended to ${plan.themeCssPath} (from createTheme — review them)`);
     }
   }
 

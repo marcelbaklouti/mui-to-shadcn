@@ -173,3 +173,26 @@ test("planSetup reports an error when no source files match", () => {
 test("the wizard module loads (imports @clack/prompts cleanly)", () => {
   assert.equal(typeof runWizard, "function");
 });
+
+test("planSetup extracts brand tokens from createTheme into a :root override", () => {
+  inProject(
+    {
+      "package.json": NEXT_PKG,
+      "package-lock.json": "",
+      "src/theme.ts":
+        'import { createTheme } from "@mui/material/styles";\n' +
+        'export const theme = createTheme({ palette: { primary: { main: "#1976d2" } }, shape: { borderRadius: 10 } });\n',
+      "src/app/globals.css": "body{}",
+    },
+    (dir) => {
+      const result = planSetup(baseOptions(dir));
+      assert.ok(result.ok);
+      if (!result.ok) return;
+      assert.ok(result.plan.themeCss, "expected themeCss");
+      assert.match(result.plan.themeCss ?? "", /--primary: #1976d2;/);
+      assert.match(result.plan.themeCss ?? "", /--radius: 10px;/);
+      assert.equal(result.plan.themeCssPath, "src/app/globals.css");
+      assert.ok(result.plan.steps.some((s) => s.includes("brand token")));
+    },
+  );
+});
