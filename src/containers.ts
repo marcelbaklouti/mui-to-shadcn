@@ -343,6 +343,38 @@ export function radioGroupContainer(context: ContainerContext): ContainerEdit[] 
   return edits;
 }
 
+// MUI maxWidth breakpoints in px; emitted as arbitrary max-w so DialogContent's
+// internal cn() overrides the default sm:max-w-lg.
+const DIALOG_MAX_WIDTH: Record<string, string> = {
+  xs: "sm:max-w-[444px]",
+  sm: "sm:max-w-[600px]",
+  md: "sm:max-w-[900px]",
+  lg: "sm:max-w-[1200px]",
+  xl: "sm:max-w-[1536px]",
+};
+
+function dialogContentAttributes(context: ContainerContext, sizeClasses: string[]): string {
+  const { element } = context;
+  const classNameAttr = attribute(element, "className");
+  const sxAttr = attribute(element, "sx");
+  const sxPart = sxAttr ? ` sx=${renderAttributeValue(sxAttr.value)}` : "";
+  if (!classNameAttr) {
+    return `${sizeClasses.length ? ` className="${sizeClasses.join(" ")}"` : ""}${sxPart}`;
+  }
+  if (classNameAttr.value.kind === "string") {
+    const combined = [...sizeClasses, classNameAttr.value.value].filter(Boolean).join(" ");
+    return ` className="${combined}"${sxPart}`;
+  }
+  if (classNameAttr.value.kind === "expression") {
+    if (sizeClasses.length) {
+      context.registerImport({ names: ["cn"], moduleSpecifier: "@/lib/utils" });
+      return ` className={cn("${sizeClasses.join(" ")}", ${classNameAttr.value.expression})}${sxPart}`;
+    }
+    return ` className={${classNameAttr.value.expression}}${sxPart}`;
+  }
+  return `${sizeClasses.length ? ` className="${sizeClasses.join(" ")}"` : ""}${sxPart}`;
+}
+
 export function dialogContainer(context: ContainerContext): ContainerEdit[] {
   const { element, node, indent } = context;
   if (attribute(element, "onClose")) {
@@ -351,6 +383,18 @@ export function dialogContainer(context: ContainerContext): ContainerEdit[] {
   if (attribute(element, "slotProps") || attribute(element, "slots") || attribute(element, "PaperProps")) {
     context.warn("Dialog slotProps/PaperProps dropped; apply paper styling via className on DialogContent");
   }
+
+  // Sizing props map to classes on the emitted DialogContent.
+  const sizeClasses: string[] = [];
+  if (attribute(element, "fullScreen")) {
+    sizeClasses.push("h-screen w-screen max-w-none rounded-none");
+  } else {
+    const maxWidth = attributeString(element, "maxWidth");
+    if (maxWidth && DIALOG_MAX_WIDTH[maxWidth]) sizeClasses.push(DIALOG_MAX_WIDTH[maxWidth]);
+    if (attribute(element, "fullWidth")) sizeClasses.push("w-full");
+  }
+  if (attributeString(element, "scroll") === "paper") sizeClasses.push("max-h-[80vh] overflow-y-auto");
+  const contentAttributes = dialogContentAttributes(context, sizeClasses);
 
   const rootAttributes = renderRootAttributes(element, {
     context,
@@ -374,7 +418,7 @@ export function dialogContainer(context: ContainerContext): ContainerEdit[] {
   const edits: ContainerEdit[] = emitWrap(
     context,
     `<Dialog${rootAttributes}>`,
-    `\n${indent}  <DialogContent${contentStyleAttributes(element)}>`,
+    `\n${indent}  <DialogContent${contentAttributes}>`,
     `${indent}  </DialogContent>\n${indent}`,
     "</Dialog>",
   );

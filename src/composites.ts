@@ -203,11 +203,12 @@ export const chipTransform: CompositeTransform = (context) => {
   }
 
   const consumed = new Set<string>(["label", "variant", "color"]);
+  const onDelete = findAttribute(context, "onDelete");
   for (const droppable of ["onDelete", "icon", "avatar", "deleteIcon", "clickable", "size"]) {
     if (findAttribute(context, droppable)) {
       consumed.add(droppable);
-      if (["onDelete", "icon", "avatar", "deleteIcon"].includes(droppable)) {
-        context.warn(`${droppable} dropped; Badge has no built-in equivalent`);
+      if (["icon", "avatar", "deleteIcon"].includes(droppable)) {
+        context.warn(`${droppable} dropped; render it as a leading/trailing child of the Badge manually`);
       }
     }
   }
@@ -219,6 +220,17 @@ export const chipTransform: CompositeTransform = (context) => {
     : context.element.hasChildren
       ? context.element.innerText.trim()
       : "";
+
+  // Deletable chips (filter tags, multi-select tokens): keep the remove
+  // affordance instead of silently dropping the handler.
+  if (onDelete) {
+    context.registerImport({ names: ["X"], moduleSpecifier: "lucide-react" });
+    context.warn("Chip onDelete rendered as a trailing remove button; restyle as needed");
+    const handler = renderAttributeValue(onDelete.value);
+    const deleteButton = ` <button type="button" onClick=${handler} className="ml-1 rounded-full outline-none hover:bg-black/10"><X className="size-3" /></button>`;
+    return `<Badge${variantText}${rest}>${inner}${deleteButton}</Badge>`;
+  }
+
   return `<Badge${variantText}${rest}>${inner}</Badge>`;
 };
 

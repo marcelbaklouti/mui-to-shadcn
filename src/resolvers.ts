@@ -92,13 +92,23 @@ export const iconButtonResolver: InPlaceResolver = (attributes, helpers) => {
   return { attributes: generated, classNames: [] };
 };
 
+// shadcn Alert only ships default|destructive, so tint success/warning/info via
+// classes (the [&>svg] rule colors an icon child if one is added).
+const ALERT_SEVERITY_CLASSES: Record<string, string> = {
+  success: "border-green-500/50 text-green-700 dark:text-green-400 [&>svg]:text-green-600",
+  warning: "border-amber-500/50 text-amber-700 dark:text-amber-400 [&>svg]:text-amber-600",
+  info: "border-sky-500/50 text-sky-700 dark:text-sky-400 [&>svg]:text-sky-600",
+};
+
 export const alertResolver: InPlaceResolver = (attributes, helpers) => {
   const generated: { name: string; value: AttributeValue }[] = [];
+  const classNames: string[] = [];
   const severity = stringValue(attributes.find((attribute) => attribute.name === "severity")?.value);
   if (severity === "error") {
     generated.push({ name: "variant", value: { kind: "string", value: "destructive" } });
-  } else if (severity && severity !== "info") {
-    helpers.warn(`severity "${severity}" has no shadcn variant; using the default variant`);
+  } else if (severity && ALERT_SEVERITY_CLASSES[severity]) {
+    classNames.push(ALERT_SEVERITY_CLASSES[severity]);
+    helpers.warn(`Alert severity "${severity}" tinted via classes; add a lucide icon as the first child for the MUI look`);
   }
 
   for (const attribute of attributes) {
@@ -120,7 +130,7 @@ export const alertResolver: InPlaceResolver = (attributes, helpers) => {
     }
   }
 
-  return { attributes: generated, classNames: [] };
+  return { attributes: generated, classNames };
 };
 
 export const fabResolver: InPlaceResolver = (attributes, helpers) => {
