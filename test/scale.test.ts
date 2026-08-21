@@ -328,6 +328,16 @@ test("a namespace import is not (yet) converted but is surfaced as residual MUI,
   );
 });
 
+// ---- sx guard: don't touch non-MUI files ----
+
+test("a file with no MUI imports is left untouched (no sx rewrite on Chakra etc.)", () => {
+  const result = migrate(
+    'import { Flex } from "@chakra-ui/react";\nexport const G = () => <Flex sx={{ p: 2, mt: 1 }}>x</Flex>;\n',
+  );
+  assert.equal(result.changed, false);
+  assert.match(result.text, /<Flex sx=\{\{ p: 2, mt: 1 \}\}>/);
+});
+
 // ---- sx emitter correctness ----
 
 test("fractional sizing: numbers in (0,1] become percentages, not pixels", () => {

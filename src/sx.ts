@@ -820,7 +820,15 @@ function buildClassNameAttribute(
   return { text: cleaned.length ? `className="${cleaned.join(" ")}"` : null, needsCn: false };
 }
 
+// Only touch files that are actually MUI-related — still importing MUI, or
+// already converted to shadcn. Otherwise `sx` on a non-MUI component (Chakra,
+// Theme UI, styled-system) would be silently rewritten with MUI's semantics.
+const MUI_RELATED_RE = /@mui\/|@material-ui\/|@emotion\/|@\/components\/ui\//;
+
 export function sxFile(sourceFile: SourceFile, fullText: string): SxResult {
+  if (!MUI_RELATED_RE.test(fullText)) {
+    return { text: fullText, warnings: [], needsCn: false };
+  }
   const bindings = collectMuiBindings(sourceFile);
   const layoutLocalNames = new Set<string>();
   for (const binding of bindings) {

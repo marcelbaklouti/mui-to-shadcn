@@ -203,6 +203,26 @@ function addTailwindImport(filePath: string): "added" | "present" | "created" {
   return "added";
 }
 
+// Redefine the Tailwind breakpoints to MUI's default values so migrated
+// responsive classes (sm:/md:/lg:/xl:) keep MUI's switch points instead of
+// silently shifting (MUI md=900 vs Tailwind md=768, etc.).
+const MUI_BREAKPOINTS_BLOCK =
+  "\n/* MUI-compatible breakpoints — migrated sm:/md:/lg:/xl: classes keep MUI's\n" +
+  "   switch points. Delete this block to use Tailwind's defaults. */\n" +
+  "@theme {\n" +
+  "  --breakpoint-sm: 600px;\n" +
+  "  --breakpoint-md: 900px;\n" +
+  "  --breakpoint-lg: 1200px;\n" +
+  "  --breakpoint-xl: 1536px;\n" +
+  "}\n";
+
+function addMuiBreakpoints(filePath: string): void {
+  if (!existsSync(filePath)) return;
+  const content = readFileSync(filePath, "utf8");
+  if (content.includes("--breakpoint-md: 900px")) return; // idempotent
+  writeFileSync(filePath, content.endsWith("\n") ? content + MUI_BREAKPOINTS_BLOCK : content + "\n" + MUI_BREAKPOINTS_BLOCK);
+}
+
 export function applyTailwind(plan: TailwindPlan, cwd: string): TailwindApplyResult {
   if (!plan.needed) return { cssAction: null, cssPath: null, postcssCreated: null };
 
@@ -211,6 +231,7 @@ export function applyTailwind(plan: TailwindPlan, cwd: string): TailwindApplyRes
   if (plan.css) {
     cssPath = plan.css.path;
     cssAction = addTailwindImport(join(cwd, plan.css.path));
+    addMuiBreakpoints(join(cwd, plan.css.path));
   }
 
   let postcssCreated: string | null = null;
