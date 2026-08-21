@@ -4,7 +4,9 @@ All notable changes to this project are documented here. This project adheres to
 
 ## [Unreleased]
 
-Theming pass (v0.7, in progress): carry the brand across so the migration looks right, not default.
+## [0.7.0] - 2026-08-21
+
+Theming pass: carry the brand across so the migration looks right, not default.
 
 ### Added
 
