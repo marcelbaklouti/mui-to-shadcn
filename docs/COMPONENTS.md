@@ -17,7 +17,7 @@ Legend: **Full** = structurally fully converted. **In parent** = converted autom
 | AlertTitle | AlertTitle | - |
 | AppBar | header | - |
 | Avatar | Avatar + AvatarImage/AvatarFallback | - |
-| Backdrop | div | - |
+| Backdrop | - | - |
 | Badge | span + Badge (positioned) | positioned overlay over the child |
 | BottomNavigation | nav | - |
 | Box | div | in the sx / system-props pass |

@@ -43,6 +43,12 @@ export interface ImportRequest {
   moduleSpecifier: string;
 }
 
+// Maps a re-export barrel file's absolute path to the MUI components it
+// re-exports: exported name -> canonical MUI name (or the "*" sentinel for a
+// blanket `export * from "@mui/material"`). Built once over all inputs so
+// consumer files that import MUI through a local barrel can be resolved.
+export type BarrelMap = Map<string, Map<string, string>>;
+
 export type PropValueMap = Record<string, string | null>;
 
 export interface PropRule {

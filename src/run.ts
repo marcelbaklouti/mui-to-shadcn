@@ -9,6 +9,7 @@ import { sxFile } from "./sx.js";
 import { iconsFile } from "./icons.js";
 import { infraFile } from "./infra.js";
 import { handlersFile } from "./handlers.js";
+import type { BarrelMap } from "./types.js";
 
 export { buildMigrationDoc } from "./migration-doc.js";
 export type { MigrationDocInput, FileReport } from "./migration-doc.js";
@@ -38,6 +39,8 @@ function collectResidualMui(text: string): string[] {
 export interface MigrationOptions {
   sx?: boolean;
   base?: "radix" | "base";
+  /** Cross-file re-export barrel map, so imports through a local barrel resolve. */
+  barrelMap?: BarrelMap;
 }
 
 const registry = buildRegistry();
@@ -58,9 +61,9 @@ export function runMigration(sourceFile: SourceFile, options: MigrationOptions =
   const applySx = options.sx !== false;
   const base = options.base ?? "radix";
   const originalText = sourceFile.getFullText();
-  const plan = planFile(sourceFile, originalText, registry, { base });
+  const plan = planFile(sourceFile, originalText, registry, { base, barrelMap: options.barrelMap });
 
-  const importEdits = buildImportEdits(sourceFile, plan.convertedCanonical, originalText);
+  const importEdits = buildImportEdits(sourceFile, plan.convertedCanonical, originalText, options.barrelMap);
   const { edits, dropped } = resolveOverlaps([...plan.edits, ...importEdits]);
 
   const warnings = [...plan.warnings];

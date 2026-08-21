@@ -2,11 +2,23 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Project } from "ts-morph";
 import { runMigration } from "../src/run.js";
+import { collectMuiReexports } from "../src/imports.js";
+import type { BarrelMap } from "../src/types.js";
 
 function migrate(source: string, name = "Test.tsx") {
   const project = new Project({ useInMemoryFileSystem: true });
   const file = project.createSourceFile(name, source);
   return runMigration(file);
+}
+
+// Build a consumer + barrel in one project and migrate the consumer with the
+// resolved barrel map, mirroring the CLI's cross-file resolution.
+function migrateThroughBarrel(barrelSource: string, consumerSource: string) {
+  const project = new Project({ useInMemoryFileSystem: true });
+  const barrel = project.createSourceFile("/src/ui/index.ts", barrelSource);
+  const consumer = project.createSourceFile("/src/pages/Home.tsx", consumerSource);
+  const barrelMap: BarrelMap = new Map([[barrel.getFilePath(), collectMuiReexports(barrel)]]);
+  return runMigration(consumer, { barrelMap });
 }
 
 // ---- v4 (@material-ui/*) support ----
@@ -197,6 +209,54 @@ test("temporary Drawer still becomes a Sheet", () => {
   );
   assert.match(result.text, /<Sheet/);
   assert.match(result.text, /<SheetContent side="left">/);
+});
+
+// ---- cross-file re-export barrel resolution ----
+
+test("a consumer importing MUI through a local barrel is converted", () => {
+  const result = migrateThroughBarrel(
+    'export { Button, Chip } from "@mui/material";\n',
+    'import { Button, Chip } from "../ui";\n' +
+      'export const Home = () => (<div><Button variant="contained">S</Button><Chip label="t" /></div>);\n',
+  );
+  assert.match(result.text, /from "@\/components\/ui\/button"/);
+  assert.match(result.text, /<Badge>t<\/Badge>/);
+  // the local barrel import is trimmed
+  assert.doesNotMatch(result.text, /from "\.\.\/ui"/);
+});
+
+test("aliased barrel re-exports resolve to the canonical MUI component", () => {
+  const result = migrateThroughBarrel(
+    'export { Button as Btn } from "@mui/material";\n',
+    'import { Btn } from "../ui";\nexport const Home = () => <Btn variant="outlined">x</Btn>;\n',
+  );
+  // the aliased tag is replaced by the canonical shadcn Button, import updated.
+  assert.match(result.text, /from "@\/components\/ui\/button"/);
+  assert.match(result.text, /<Button variant="outline">/);
+  assert.doesNotMatch(result.text, /<Btn\b/);
+});
+
+test("a partly-MUI barrel import keeps its non-MUI names", () => {
+  const result = migrateThroughBarrel(
+    'export { Button } from "@mui/material";\nexport const useThing = () => 1;\n',
+    'import { Button, useThing } from "../ui";\n' +
+      "export const Home = () => { useThing(); return <Button>x</Button>; };\n",
+  );
+  assert.match(result.text, /import \{ useThing \} from "\.\.\/ui"/);
+  assert.match(result.text, /from "@\/components\/ui\/button"/);
+});
+
+test("collectMuiReexports maps named, aliased, deep, and star re-exports", () => {
+  const project = new Project({ useInMemoryFileSystem: true });
+  const barrel = project.createSourceFile(
+    "/b.ts",
+    'export { Button, Chip as Tag } from "@mui/material";\n' +
+      'export { default as Dlg } from "@mui/material/Dialog";\n',
+  );
+  const map = collectMuiReexports(barrel);
+  assert.equal(map.get("Button"), "Button");
+  assert.equal(map.get("Tag"), "Chip");
+  assert.equal(map.get("Dlg"), "Dialog");
 });
 
 // ---- reference-safe import removal ----
