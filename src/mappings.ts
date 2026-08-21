@@ -1,5 +1,5 @@
 import type { AttributeValue, ComponentMapping, Registry } from "./types.js";
-import { alertResolver, fabResolver, iconButtonResolver, listItemButtonResolver, menuItemResolver } from "./resolvers.js";
+import { alertResolver, fabResolver, iconButtonResolver, linearProgressResolver, listItemButtonResolver, menuItemResolver } from "./resolvers.js";
 import {
   avatarTransform,
   buttonTransform,
@@ -189,11 +189,7 @@ export function buildRegistry(): Registry {
   registry.LinearProgress = {
     target: "Progress",
     importPath: "@/components/ui/progress",
-    props: {
-      variant: { drop: true, warning: "LinearProgress variant dropped; Progress is always determinate" },
-      color: { drop: true },
-      valueBuffer: { drop: true, warning: "valueBuffer dropped; Progress has no buffer" },
-    },
+    resolve: linearProgressResolver,
   };
 
   registry.Skeleton = {

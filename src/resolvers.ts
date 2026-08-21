@@ -66,6 +66,33 @@ export const menuItemResolver: InPlaceResolver = (attributes, helpers) => {
   return { attributes: generated, classNames: [] };
 };
 
+// LinearProgress -> Progress. Warn when it is indeterminate (no `value` — the
+// default and most common usage): shadcn Progress has no indeterminate mode and
+// would render a frozen empty bar.
+export const linearProgressResolver: InPlaceResolver = (attributes, helpers) => {
+  if (!attributes.some((attribute) => attribute.name === "value")) {
+    helpers.warn(
+      "LinearProgress is indeterminate (no value); shadcn Progress has no indeterminate mode and renders an empty static bar — add a value or an animated placeholder",
+    );
+  }
+  const generated: { name: string; value: AttributeValue }[] = [];
+  for (const attribute of attributes) {
+    switch (attribute.name) {
+      case "variant":
+        helpers.warn("LinearProgress variant dropped; Progress is always determinate");
+        break;
+      case "valueBuffer":
+        helpers.warn("valueBuffer dropped; Progress has no buffer");
+        break;
+      case "color":
+        break;
+      default:
+        generated.push({ name: attribute.name, value: attribute.value });
+    }
+  }
+  return { attributes: generated, classNames: [] };
+};
+
 export const iconButtonResolver: InPlaceResolver = (attributes, helpers) => {
   const generated: { name: string; value: AttributeValue }[] = [
     { name: "variant", value: { kind: "string", value: "ghost" } },

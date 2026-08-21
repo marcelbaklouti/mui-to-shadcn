@@ -17,6 +17,11 @@ Fidelity pass (v0.6, in progress): converting common APIs faithfully rather than
 - **Dialog sizing is preserved.** `fullWidth`, `maxWidth` (`xs`–`xl` → exact `sm:max-w-[…px]`), `fullScreen`, and `scroll="paper"` were dropped silently (wide dialogs collapsed to the shadcn default width). They now become classes on the emitted `DialogContent` (merged via `cn` when it already has a `className` expression).
 - **The `sx` pass no longer touches non-MUI files.** A file with no MUI/`@material-ui`/`@emotion`/shadcn-ui markers is skipped entirely, so `sx` on a Chakra/Theme-UI/styled-system component is not silently rewritten with MUI's spacing semantics.
 - **`--setup` keeps MUI's breakpoints.** When it sets up Tailwind from scratch, it appends an `@theme` block redefining `sm`/`md`/`lg`/`xl` to MUI's values (600/900/1200/1536), so migrated responsive classes keep their switch points instead of silently shifting (MUI `md`=900 vs Tailwind `md`=768). The block is clearly commented and can be deleted to use Tailwind's defaults.
+- **Accordion keeps defaultExpanded/disabled.** `defaultExpanded` maps to `defaultValue="item-1"`; `disabled` is forwarded to the `AccordionItem`; controlled `expanded`/`onChange` get a clearer warning.
+- **Tab keeps disabled (and other passthrough props).** `disabled` (and `onClick`/`className`/`data-*`/`aria-*`) are forwarded onto `TabsTrigger` instead of being dropped, so a disabled tab stays disabled.
+- **Tooltip maps delay and keeps className.** `enterDelay` becomes `delayDuration` on `TooltipProvider`; `className` goes onto `TooltipContent`; other discarded props (open/onOpen/onClose/arrow/leaveDelay) are named in a warning.
+- **Badge hides when it should.** `invisible={…}` gates the emitted Badge, and a numeric `badgeContent` hides at zero by default (MUI `showZero=false`), instead of always rendering a `0`.
+- **Bare `<LinearProgress />` warns.** The indeterminate default (no `value`) now warns that shadcn Progress has no indeterminate mode and would render a frozen empty bar.
 
 ## [0.5.0] - 2026-08-21
 
